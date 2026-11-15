@@ -1,8 +1,9 @@
 # Database Schema — UniAttend
 
-Source of truth for the schema is
-`supabase/migrations/20261115000000_init.sql`. This document describes
-it; the migration is authoritative. All 12 tables from spec §11.
+Source of truth for the schema is the migrations in
+`supabase/migrations/`. This document describes them; the migrations
+are authoritative. All 12 tables from spec §11, plus the Phase 2
+columns added by `20261115010000_session_qr_tokens.sql`.
 
 ## Tables
 
@@ -113,6 +114,9 @@ Teaching permissions. A lecturer sees only what is assigned here.
 | headcount | integer | expected/physically counted total; check >= 0 when set |
 | qr_expires_in_seconds | integer, default 300 | |
 | status | session_status enum, default `draft` | draft / active / closed / finalized / archived |
+| qr_token_hash | text, nullable | **Phase 2:** SHA-256 hash of the live QR token. Never the token itself. Added by `20261115010000_session_qr_tokens.sql` |
+| qr_token_issued_at | timestamptz, nullable | **Phase 2:** when the live token was issued; expiry = this + `qr_expires_in_seconds`, checked server-side |
+| passcode_hash | text, nullable | **Phase 2:** SHA-256 hash of the 6-digit classroom passcode. Never the passcode itself |
 | created_at / updated_at | timestamptz, default now() | |
 
 Session status transitions are enforced in application/Edge Function
@@ -129,6 +133,7 @@ itself only restricts the value set.
 | status | text, default `verified` | check in (`verified`, `manual`, `pending`, `rejected`, `suspicious`) |
 | verification_method | text | e.g. `qr`, `manual`, `passcode` |
 | manual_reason | text | required in practice for manual entries (enforced server-side) |
+| idempotency_key | text, nullable | **Phase 2:** stable per-(session, student) key; unique index on `(session_id, idempotency_key)` where not null, so a retried submission returns the original record |
 | submitted_at | timestamptz, default now() | |
 | **unique (session_id, registration_number)** | | **A reg. no. cannot be duplicated within a session** |
 

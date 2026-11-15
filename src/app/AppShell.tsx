@@ -1,21 +1,37 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { getSubmitParams } from '@/lib/edgeFunctions';
 import { useAuth } from '@/hooks/useAuth';
 import { NAV_TITLES, type NavKey } from './routes';
 import { Overview } from './Overview';
 import { MobileNav, Sidebar } from '@/components/layout/Sidebar';
 import { SignInForm } from '@/features/authentication/SignInForm';
+import { SubmitAttendance } from '@/features/submission/SubmitAttendance';
 import { DepartmentList } from '@/features/departments/DepartmentList';
 import { CourseList } from '@/features/courses/CourseList';
 import { SessionWorkspace } from '@/features/attendance/SessionWorkspace';
 import { HistoryList } from '@/features/history/HistoryList';
 import { ReportsPanel } from '@/features/reports/ReportsPanel';
+import { ProfileScreen } from '@/features/profile/ProfileScreen';
 import { Button } from '@/components/ui/button';
 import { EmptyState, LoadingState } from '@/components/ui/empty-state';
 
 export function AppShell() {
   const [current, setCurrent] = useState<NavKey>('overview');
   const auth = useAuth();
+
+  // Public student submission (?submit=<sessionId>&token=<token>) is
+  // rendered without sign-in and before any auth gate. It asks only
+  // for a registration number and exposes no other session's data.
+  const submitParams =
+    typeof window !== 'undefined' ? getSubmitParams(window.location.search) : null;
+  if (submitParams) {
+    return (
+      <div className="min-h-screen bg-surface">
+        <SubmitAttendance />
+      </div>
+    );
+  }
 
   if (auth.status === 'loading') {
     return (
@@ -34,7 +50,7 @@ export function AppShell() {
         </div>
         <EmptyState
           title="Supabase is not configured yet"
-          description="Copy .env.example to .env and add your Supabase project URL and anon key, then reload. Sign-in is unavailable until then."
+          description="Supabase is not connected yet. Sign-in is unavailable until then."
         />
       </div>
     );
@@ -75,14 +91,7 @@ export function AppShell() {
           {current === 'sessions' ? <SessionWorkspace /> : null}
           {current === 'history' ? <HistoryList /> : null}
           {current === 'reports' ? <ReportsPanel /> : null}
-          {current === 'profile' ? (
-            <div className="flex flex-col items-start gap-2">
-              <p className="text-[15px] text-ink">{auth.session.user.email ?? 'Signed in'}</p>
-              <p className="text-[13px] text-muted">
-                Profile editing and settings are part of the Phase 1 foundation and will be expanded with lecturer profile fields.
-              </p>
-            </div>
-          ) : null}
+          {current === 'profile' ? <ProfileScreen /> : null}
         </main>
       </div>
     </div>

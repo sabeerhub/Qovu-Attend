@@ -14,12 +14,10 @@ as the backend. Free tier only, within published quotas.
 
 ## Environment variables
 
-Set these in Cloudflare Pages (and in a local `.env`, never
+Set the Supabase connection values in your Cloudflare Pages dashboard (never in this repo, never
 committed):
 
 ```
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key-here
 ```
 
 There is no other secret in Phase 1.

@@ -1,36 +1,50 @@
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
-import type { Department } from '@/types/database';
+import { useState } from 'react';
+import { useAssignments } from '@/hooks/useAssignments';
+import { DepartmentWorkspace } from './DepartmentWorkspace';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/empty-state';
 
-/** Departments the signed-in lecturer is assigned to (via RLS). */
+/**
+ * Departments the signed-in lecturer is assigned to, loaded through
+ * `lecturer_assignments` (via RLS). Selecting a department opens its
+ * workspace. Unassigned departments are never shown.
+ */
 export function DepartmentList() {
-  const [state, setState] = useState<
-    | { status: 'loading' }
-    | { status: 'error'; message: string }
-    | { status: 'ready'; departments: Department[] }
-  >({ status: 'loading' });
+  const state = useAssignments();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!supabase) return;
-    (async () => {
-      try {
-        const { data, error } = await supabase
-          .from('departments')
-          .select('id, faculty_id, name, code, created_at')
-          .order('name');
-        if (error) setState({ status: 'error', message: error.message });
-        else setState({ status: 'ready', departments: (data ?? []) as Department[] });
-      } catch (err: unknown) {
-        setState({ status: 'error', message: err instanceof Error ? err.message : 'Could not load departments.' });
-      }
-    })();
-  }, []);
-
+  if (state.status === 'not-configured') {
+    return (
+      <EmptyState
+        title="Supabase is not configured yet"
+        description="Supabase is not connected yet."
+      />
+    );
+  }
   if (state.status === 'loading') return <LoadingState label="Loading departments…" />;
   if (state.status === 'error') return <ErrorState message={state.message} />;
-  if (state.departments.length === 0) {
+  if (state.status === 'no-profile') {
+    return (
+      <EmptyState
+        title="No lecturer profile found"
+        description="Your account has no lecturer profile yet. Ask your university administrator to create one for your account."
+      />
+    );
+  }
+
+  const { departments, courses } = state.data;
+  const selected = departments.find((d) => d.id === selectedId);
+  if (selected) {
+    return (
+      <DepartmentWorkspace
+        department={selected}
+        courses={courses.filter((c) => c.department_id === selected.id)}
+        onBack={() => setSelectedId(null)}
+      />
+    );
+  }
+
+  if (departments.length === 0) {
     return (
       <EmptyState
         title="No departments yet"
@@ -40,16 +54,32 @@ export function DepartmentList() {
   }
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {state.departments.map((dept) => (
-        <Card key={dept.id}>
-          <CardHeader>
-            <CardTitle>{dept.name}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-[13px] text-muted">{dept.code ?? 'No code'}</p>
-          </CardContent>
-        </Card>
-      ))}
+      {departments.map((dept) => {
+        const deptCourses = courses.filter((c) => c.department_id === dept.id);
+        return (
+          <Card key={dept.id}>
+            <CardHeader>
+              <CardTitle>{dept.name}</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col items-start gap-2">
+              <p className="text-[13px] text-muted">
+                {dept.facultyName ?? 'No faculty recorded'}
+                {dept.code ? ` · ${dept.code}` : ''}
+              </p>
+              <p className="text-[13px] text-muted">
+                {deptCourses.length} assigned course{deptCourses.length === 1 ? '' : 's'}
+              </p>
+              <button
+                type="button"
+                onClick={() => setSelectedId(dept.id)}
+                className="text-[14px] font-medium text-accent hover:underline"
+              >
+                Open workspace
+              </button>
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }

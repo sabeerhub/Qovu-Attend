@@ -15,7 +15,7 @@ export function SignInForm() {
     event.preventDefault();
     setError(null);
     if (!supabase) {
-      setError('Supabase is not configured yet. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.');
+      setError('Supabase is not connected yet.');
       return;
     }
     setLoading(true);

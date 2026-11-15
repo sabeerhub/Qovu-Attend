@@ -1,4 +1,10 @@
-# Integration tests — planned, not yet written
+# Integration tests
+
+Mocked-client Edge Function tests live here
+(`tests/integration/edge-functions.test.ts`): they stub `fetch` and
+the Supabase module, so they run with no credentials and verify the
+client contract only — they do NOT prove the functions run on
+Supabase.
 
 Integration tests against a live Supabase project are required
 before pilot (see `docs/TESTING_STRATEGY.md`):

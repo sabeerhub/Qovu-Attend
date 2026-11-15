@@ -102,6 +102,12 @@ export interface AttendanceSession {
   status: SessionStatus;
   created_at: string;
   updated_at: string;
+  /** SHA-256 hash of the live QR token, or null before first activation. Never the token itself. */
+  qr_token_hash: string | null;
+  /** When the live QR token was issued (server-side expiry = this + qr_expires_in_seconds). */
+  qr_token_issued_at: string | null;
+  /** SHA-256 hash of the classroom passcode, or null before first activation. */
+  passcode_hash: string | null;
 }
 
 export interface AttendanceRecord {
@@ -112,6 +118,8 @@ export interface AttendanceRecord {
   status: AttendanceRecordStatus;
   verification_method: string | null;
   manual_reason: string | null;
+  /** Stable per-(session, student) key; a retried submission returns the original record. */
+  idempotency_key: string | null;
   submitted_at: string;
 }
 

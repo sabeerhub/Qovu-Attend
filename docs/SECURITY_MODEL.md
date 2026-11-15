@@ -13,11 +13,10 @@
 
 - Supabase Auth for lecturer and administrator accounts.
 - No student account is required for the MVP.
-- The frontend uses only `VITE_SUPABASE_URL` and
-  `VITE_SUPABASE_ANON_KEY` (see `.env.example`). The anon key is a
+- The frontend uses only the Supabase project URL and its publishable key. The publishable key is a
   public client key; it grants nothing by itself — RLS decides access.
 - A service-role key must never appear in the frontend, in the repo,
-  or in any `.env` file committed to version control. It is only used
+  or in any file committed to version control. It is only used
   by Edge Functions / server-side code, if at all.
 
 ## Authorization
@@ -62,10 +61,25 @@ nothing. Do not treat them as verified until that test has run.
   read-only for ordinary use; corrections require an authorized
   action and an audit log row.
 - QR tokens are secure random, short-lived, and expiry is validated
-  server-side (Phase 2). The client never decides whether a session
-  is still open.
-- Rate limiting on attendance submissions and idempotency protection
-  for retries are server-side concerns (Phase 2 Edge Function).
+  server-side (Phase 2, implemented). Only the SHA-256 hash of a
+  token — and of the classroom passcode — is stored, in
+  `attendance_sessions.qr_token_hash` / `passcode_hash` with
+  `qr_token_issued_at` (migration `20261115010000`). The token and
+  passcode are returned once, at activation, and cannot be recovered
+  from the database afterwards. The client never decides whether a
+  session is still open; the countdown in the UI is display-only.
+- The client has NO insert/update policy on `attendance_records` or
+  `attendance_audit_logs`, and `attendance_sessions` insert is
+  Draft-only. All Phase 2 writes go through Edge Functions
+  (`attendance-submit`, `session-transition`, `manual-attendance`),
+  which use the service-role key server-side only. The frontend never
+  sees that key, and the client never submits an attendance status.
+- Rate limiting on attendance submissions (best-effort in-memory
+  guard, 60/session/minute — not a production-grade distributed
+  limiter) and idempotency protection for retries (stable
+  per-(session, student) key, unique index on
+  `(session_id, idempotency_key)`, duplicate retries return the
+  original record) are server-side concerns (Phase 2 Edge Functions).
 - Every manual entry and correction records lecturer, timestamp,
   reason and previous/new status in `attendance_audit_logs`.
 
@@ -78,6 +92,6 @@ nothing. Do not treat them as verified until that test has run.
 
 ## Secrets
 
-- `.env` is gitignored. Only `.env.example` (placeholders) is
+- Environment files are gitignored and never committed.
   committed.
 - No secrets in code, logs, or seed data.

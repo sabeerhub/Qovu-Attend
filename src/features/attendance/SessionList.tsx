@@ -1,16 +1,31 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { transitionSession } from '@/lib/edgeFunctions';
 import type { AttendanceSession } from '@/types/database';
 import { StatusBadge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/empty-state';
+import type { ActivationResult } from './SessionMonitor';
 
-/** The lecturer's own attendance sessions (via RLS). */
-export function SessionList({ refreshKey }: { refreshKey: number }) {
+interface SessionRow extends AttendanceSession {
+  courses: { code: string } | null;
+}
+
+/** The lecturer's own attendance sessions (via RLS), with course code. */
+export function SessionList({
+  refreshKey,
+  onSelect,
+}: {
+  refreshKey: number;
+  onSelect: (session: SessionRow, activation: ActivationResult | null) => void;
+}) {
   const [state, setState] = useState<
     | { status: 'loading' }
     | { status: 'error'; message: string }
-    | { status: 'ready'; sessions: AttendanceSession[] }
+    | { status: 'ready'; sessions: SessionRow[] }
   >({ status: 'loading' });
+  const [activatingId, setActivatingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!supabase) return;
@@ -18,10 +33,12 @@ export function SessionList({ refreshKey }: { refreshKey: number }) {
       try {
         const { data, error } = await supabase
           .from('attendance_sessions')
-          .select('id, course_id, lecturer_id, semester_id, lecture_room_id, title, lecture_date, week_number, headcount, qr_expires_in_seconds, status, created_at, updated_at')
+          .select(
+            'id, course_id, lecturer_id, semester_id, lecture_room_id, title, lecture_date, week_number, headcount, qr_expires_in_seconds, status, created_at, updated_at, courses(code)',
+          )
           .order('lecture_date', { ascending: false });
         if (error) setState({ status: 'error', message: error.message });
-        else setState({ status: 'ready', sessions: (data ?? []) as AttendanceSession[] });
+        else setState({ status: 'ready', sessions: (data ?? []) as unknown as SessionRow[] });
       } catch (err: unknown) {
         setState({ status: 'error', message: err instanceof Error ? err.message : 'Could not load sessions.' });
       }
@@ -38,28 +55,79 @@ export function SessionList({ refreshKey }: { refreshKey: number }) {
       />
     );
   }
+
+  async function onActivate(session: SessionRow) {
+    setActionError(null);
+    setActivatingId(session.id);
+    const result = await transitionSession(session.id, 'active');
+    setActivatingId(null);
+    if (!result.ok) {
+      setActionError(result.error.message);
+      return;
+    }
+    if (result.data.token && result.data.passcode && result.data.session.qr_token_issued_at) {
+      onSelect(
+        { ...session, status: result.data.session.status },
+        {
+          token: result.data.token,
+          passcode: result.data.passcode,
+          issuedAt: result.data.session.qr_token_issued_at,
+          expiresInSeconds: result.data.session.qr_expires_in_seconds,
+        },
+      );
+    } else {
+      onSelect({ ...session, status: result.data.session.status }, null);
+    }
+  }
+
   return (
-    <table className="w-full text-left text-sm">
-      <thead>
-        <tr className="border-b border-line text-[12px] uppercase text-muted">
-          <th className="py-2 pr-4 font-medium">Title</th>
-          <th className="py-2 pr-4 font-medium">Week</th>
-          <th className="py-2 pr-4 font-medium">Date</th>
-          <th className="py-2 font-medium">Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {state.sessions.map((session) => (
-          <tr key={session.id} className="border-b border-line">
-            <td className="py-3 pr-4 text-ink">{session.title}</td>
-            <td className="py-3 pr-4 text-muted">Week {session.week_number}</td>
-            <td className="py-3 pr-4 text-muted">{session.lecture_date}</td>
-            <td className="py-3">
-              <StatusBadge status={session.status} />
-            </td>
+    <>
+      {actionError ? (
+        <p className="mb-4 text-[13px] text-danger" role="alert">
+          {actionError}
+        </p>
+      ) : null}
+      <table className="w-full text-left text-sm">
+        <thead>
+          <tr className="border-b border-line text-[12px] uppercase text-muted">
+            <th className="py-2 pr-4 font-medium">Title</th>
+            <th className="py-2 pr-4 font-medium">Course</th>
+            <th className="py-2 pr-4 font-medium">Week</th>
+            <th className="py-2 pr-4 font-medium">Date</th>
+            <th className="py-2 pr-4 font-medium">Status</th>
+            <th className="py-2 font-medium"> </th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {state.sessions.map((session) => (
+            <tr key={session.id} className="border-b border-line last:border-b-0">
+              <td className="py-3 pr-4 text-ink">{session.title}</td>
+              <td className="py-3 pr-4 text-muted">{session.courses?.code ?? '—'}</td>
+              <td className="py-3 pr-4 text-muted">Week {session.week_number}</td>
+              <td className="py-3 pr-4 text-muted">{session.lecture_date}</td>
+              <td className="py-3 pr-4">
+                <StatusBadge status={session.status} />
+              </td>
+              <td className="py-3">
+                <div className="flex justify-end gap-2">
+                  {session.status === 'draft' ? (
+                    <Button
+                      variant="secondary"
+                      disabled={activatingId !== null}
+                      onClick={() => void onActivate(session)}
+                    >
+                      {activatingId === session.id ? 'Activating…' : 'Activate'}
+                    </Button>
+                  ) : null}
+                  <Button variant="secondary" onClick={() => onSelect(session, null)}>
+                    Open
+                  </Button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
   );
 }

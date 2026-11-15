@@ -5,8 +5,14 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undef
 
 /** True only when both placeholder env vars have real (non-placeholder) values. */
 export const isSupabaseConfigured = Boolean(
-  supabaseUrl && supabaseAnonKey && !supabaseUrl.includes('your-project'),
+  Boolean(supabaseUrl && supabaseAnonKey),
 );
+
+/** Raw configured values, for direct Edge Function calls (fetch). */
+export const supabaseConfig =
+  isSupabaseConfigured && supabaseUrl && supabaseAnonKey
+    ? { url: supabaseUrl, anonKey: supabaseAnonKey }
+    : null;
 
 /**
  * Supabase client. Created only when configured; otherwise null and

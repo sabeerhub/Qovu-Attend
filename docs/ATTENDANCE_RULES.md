@@ -1,12 +1,19 @@
 # Attendance Rules — UniAttend
 
-## Calendar
+## Calendar (Phase 1, implemented 2026-11-15)
 
 - A semester has exactly 15 teaching weeks by default (Week 1–Week 15).
 - Weeks are configurable by academic administrators via the academic
   session and semester dates; the 15-week default is not hardcoded
   in a way that prevents configuration, but the week number on a
   session is always validated to 1–15.
+- **Week derivation (implemented in `src/lib/calendar.ts`):** week 1
+  is the first 7 days starting on the semester `start_date`; week N
+  covers days 7·(N−1) … 7·N−1 after the start date. A lecture date
+  that falls outside the semester dates, or beyond week 15, has no
+  week number and is rejected. Session creation cross-checks the
+  chosen week against the week the lecture date falls in — a
+  mismatch is rejected client-side before any network call.
 - History is organized by academic session, semester and week.
 
 ## Sessions
@@ -21,6 +28,17 @@
   settings.
 - Lecturer, creation timestamp and status are recorded automatically
   by the system, never supplied by the client.
+- **Classroom verification settings (Phase 2, implemented):** when a
+  session is activated (draft→active, or closed→active on reopen) the
+  `session-transition` Edge Function generates a secure random QR
+  token and a 6-digit classroom passcode server-side. Only their
+  SHA-256 hashes (`qr_token_hash`, `passcode_hash`) and
+  `qr_token_issued_at` are stored (migration
+  `20261115010000_session_qr_tokens.sql`); the values are returned
+  once to the lecturer and shown with the QR code. Students submit at
+  `?submit=<sessionId>&token=<token>` (or enter the passcode); expiry
+  is checked server-side from `qr_token_issued_at` +
+  `qr_expires_in_seconds`.
 
 ## Lifecycle
 
@@ -46,7 +64,9 @@ Allowed transitions (also enforced in `lib/attendance.ts` and tested):
 | archived | — (terminal) |
 
 `closed → active` (reopen) is allowed only before finalization, and
-must be recorded in the audit log.
+must be recorded in the audit log. Any transition to `active`
+(activation or reopen) issues a fresh QR token + passcode server-side
+(Phase 2); the previous code stops working.
 
 ## Records
 
