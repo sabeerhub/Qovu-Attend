@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-surface text-ink font-sans text-[15px] leading-relaxed;
+  }
+  :focus-visible {
+    outline: 2px solid rgba(0, 113, 227, 0.35);
+    outline-offset: 2px;
+  }
+}

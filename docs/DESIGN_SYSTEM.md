@@ -1,0 +1,100 @@
+# Design System — UniAttend
+
+## Direction
+
+Apple-level minimalist. Quiet, confident, and out of the way. The
+interface should feel like a well-made utility, not a showcase.
+White/light background, clear typography, strong hierarchy, restrained
+color, generous whitespace. **No AI slop.**
+
+Explicitly forbidden in this product:
+
+- Gradients of any kind (especially purple/blue gradient blobs).
+- Glassmorphism, frosted panels, heavy shadows, glow effects.
+- Oversized decorative icons, illustration packs, emoji in the UI.
+- Cluttered dashboards, stat-card walls, unnecessary animation.
+- More than one accent color, and the accent used for decoration
+  rather than action.
+
+## Color
+
+| Token | Value | Use |
+|---|---|---|
+| Background | `#ffffff` | Page background |
+| Canvas | `#f5f5f7` | App canvas behind content, sidebar |
+| Text | `#111111` | Primary text |
+| Secondary text | `#6e6e73` | Descriptions, metadata |
+| Faint text | `#86868b` | Placeholders, captions |
+| Border | `#e5e5e5` | 1px hairlines, card borders |
+| Accent | `#0071e3` | Primary actions and links only |
+| Accent hover | `#0077ed` | Hover state |
+| Accent pressed | `#0060c5` | Pressed state |
+| Success | `#1d7a3d` | Success text / status dot |
+| Danger | `#c9242e` | Destructive actions, errors |
+| Warning | `#8a5a00` | Warnings |
+
+Neutrals only, plus one blue. Status is shown with a small dot and a
+word (`Active`, `Finalized`), not with a loud colored chip.
+
+## Typography
+
+- Font stack: `-apple-system, BlinkMacSystemFont, "SF Pro Text",
+  "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", Arial,
+  sans-serif`. No webfont download is required; use the system font.
+- Page title: 24px, weight 600, tight letter spacing.
+- Section title: 17px, weight 600.
+- Body: 15px, weight 400, line height 1.5.
+- Secondary / caption: 13px, `#6e6e73`.
+- Numbers in summaries: 28px, weight 600 — plain, no colored
+  backgrounds behind them.
+
+## Spacing
+
+8px scale: 4, 8, 16, 24, 32, 48, 64. Content max width 1120px.
+Page padding: 24px on desktop, 16px on mobile. Cards have 16–24px
+internal padding.
+
+## Components
+
+- **Radius:** 8px small controls, 10px cards, 12px large panels.
+- **Borders:** 1px `#e5e5e5`. Shadow: at most `0 1px 2px
+  rgba(0,0,0,0.04)` on cards. No other shadows.
+- **Buttons:** primary = solid `#0071e3`, white text, 8px radius,
+  height 36px. Secondary = white, 1px border. Destructive = text /
+  border in `#c9242e`, never a solid red block. Disabled = 40%
+  opacity, no pointer events.
+- **Inputs:** white, 1px `#e5e5e5` border, 8px radius, 36px height,
+  focus ring `2px rgba(0,113,227,0.35)`.
+- **Tables:** plain rows, 1px bottom hairline, 13–14px text, header
+  in 12px uppercase secondary text. No zebra striping, no colored
+  row backgrounds.
+- **Sidebar (desktop):** 240px, `#f5f5f7` background, 15px nav items,
+  active item is `#111111` text with a white pill background — not a
+  colored bar.
+- **Mobile:** bottom or top navigation with the same 7 items, same
+  labels, no icons-only navigation.
+- **Status:** a 6px dot + label text.
+
+## States (every screen must handle all four)
+
+- **Loading:** a single centered spinner or skeleton lines in the
+  content area; no fake content while loading.
+- **Empty:** a short sentence and one action, e.g. “No attendance
+  sessions yet. Create your first session.” Nothing decorative.
+- **Error:** a plain sentence explaining what happened and what to
+  do next, plus a retry action.
+- **Success:** a one-line confirmation, no modal fireworks.
+
+## Layout
+
+- Mobile-first. One column on mobile, sidebar + content from 768px.
+- Desktop sidebar navigation; mobile navigation bar.
+- No hardcoded statistics anywhere: every number on the Overview
+  comes from a database query, and the empty state is shown when
+  there is no data.
+
+## Accessibility
+
+- Semantic headings, labels on every input, focus-visible outlines.
+- Color is never the only signal (status always has text).
+- Minimum touch target 36px; text contrast meets WCAG AA.
