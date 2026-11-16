@@ -88,6 +88,20 @@ Teaching permissions. A lecturer sees only what is assigned here.
 | created_at | timestamptz, default now() | |
 | unique (department_id, code, semester_id) | | Same code, different semester is allowed |
 
+### create_lecturer_course (RPC, v0.4.0)
+
+`create_lecturer_course(p_department_id, p_semester_id, p_code,
+p_title, p_level, p_credit_unit) returns courses` — `SECURITY
+DEFINER`, executable by `authenticated` only. Resolves the caller's
+lecturer profile from `auth.uid()` (error if none); validates
+department and semester exist, code (trimmed, upper-cased, ≤ 20
+chars, letters/numbers/spaces only), title (≤ 120 chars), level
+(100–900), credit units (null or 1–6); inserts the course and the
+caller's own `lecturer_assignments` row (role `lecturer`)
+atomically; returns the created course. Duplicate code in the same
+department + semester raises a clean `course_code_duplicate` error
+via the unique constraint. See `docs/API_CONTRACTS.md`.
+
 ### lecture_rooms
 | Column | Type | Notes |
 |---|---|---|
@@ -171,3 +185,11 @@ RLS is enabled on every table in the migration. Policies are sketched
 in the migration file and described in `SECURITY_MODEL.md`. They have
 **not** been verified against a live Supabase project — see the
 unverified items in the migration and in the project README.
+
+v0.4.0 addition (`20261116000000_lecturer_course_create.sql`): any
+signed-in lecturer may read the reference tables `departments`,
+`semesters`, `academic_sessions`, `faculties` and `universities`
+(policies `*_authenticated_read`), so the course-creation pickers
+have options. Course creation itself is server-side only, through
+the `create_lecturer_course` RPC — there is no direct client insert
+policy on `courses` or `lecturer_assignments`.

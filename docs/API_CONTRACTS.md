@@ -26,6 +26,11 @@ The client may read, through RLS:
   (or, for sessions/semesters, the rows referenced by assigned
   courses). Lecture rooms are read only for the lecturer's assigned
   departments, to offer a room choice in session creation.
+- Since v0.4.0, any signed-in lecturer may also read the reference
+  tables `departments`, `semesters`, `academic_sessions`,
+  `faculties` and `universities` in full (policies
+  `*_authenticated_read`), so the course-creation pickers have
+  options. Attendance data is unaffected by this.
 - `attendance_sessions` — own sessions only.
 - `attendance_records` — records of own sessions only.
 
@@ -44,10 +49,48 @@ The client may insert:
 
 The client must never insert/update/delete:
 
+- `courses` or `lecturer_assignments` directly. Course creation
+  goes only through the `create_lecturer_course` RPC below.
 - `attendance_records` directly with a client-chosen status (Phase 2
   submissions go through an Edge Function).
 - `attendance_audit_logs` (insert-only, server-side).
 - `universities`, `faculties`, `departments` (admin-controlled).
+
+## RPC: create_lecturer_course (v0.4.0, implemented — untested against a live project)
+
+Defined in
+`supabase/migrations/20261116000000_lecturer_course_create.sql`.
+The client calls it via `supabase.rpc('create_lecturer_course', …)`
+(see `src/lib/courseForm.ts` `createCourse`); the lecturer's id is
+taken from the auth session, never from the request.
+
+Request (arguments):
+
+```json
+{
+  "p_department_id": "uuid",
+  "p_semester_id": "uuid",
+  "p_code": "CIT 301",
+  "p_title": "Web Technology",
+  "p_level": 300,
+  "p_credit_unit": 3
+}
+```
+
+`p_credit_unit` may be `null`. The server trims and upper-cases the
+code; it validates department and semester exist, level 100–900,
+credit units 1–6 when set, and the unique
+`(department_id, code, semester_id)` rule. On success it returns the
+created `courses` row and has also inserted the caller's own
+`lecturer_assignments` row (role `lecturer`) in the same
+transaction. On failure PostgREST returns the RPC exception message,
+prefixed with a stable code the client maps to plain language
+(`course_code_duplicate`, `lecturer_profile_not_found`,
+`department_not_found`, `semester_not_found`, plus the field-level
+codes `course_code_required`, `course_code_too_long`,
+`course_code_invalid`, `course_title_required`,
+`course_title_too_long`, `course_level_invalid`,
+`course_credit_unit_invalid`).
 
 ## Edge Functions (Phase 2, implemented — untested against a live project)
 

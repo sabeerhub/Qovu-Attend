@@ -91,8 +91,10 @@ Done:
   system (see `docs/DESIGN_SYSTEM.md`).
 - Real Supabase Auth sign-in and a Profile & Settings screen that
   loads the signed-in lecturer's row from `lecturer_profiles`
-  (full name, email, staff ID). Assignments are admin-controlled;
-  the screen says so plainly.
+  (full name, email, staff ID). Assignments are admin-controlled,
+  except that since v0.4.0 a lecturer can create a course
+  themselves — the course is then assigned to them automatically
+  (see `CHANGELOG.md`).
 - Assignment-driven departments and courses: everything shown comes
   through `lecturer_assignments` (distinct department/course counts,
   never raw rows). Each department opens its own workspace (faculty,

@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useAssignments } from '@/hooks/useAssignments';
+import { CourseForm } from './CourseForm';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/empty-state';
 
@@ -8,10 +10,17 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/ui/empty-stat
  * `lecturer_assignments` (via RLS). Each course shows its department
  * and semester names, and the list can be filtered by department.
  * Unassigned courses are never shown.
+ *
+ * Since v0.4.0 a lecturer can also create a course (department,
+ * semester, code, title, level, credit units) through the
+ * server-side `create_lecturer_course` RPC, which creates their
+ * own assignment to the course at the same time.
  */
 export function CourseList() {
-  const state = useAssignments();
+  const [refreshKey, setRefreshKey] = useState(0);
+  const state = useAssignments(refreshKey);
   const [departmentFilter, setDepartmentFilter] = useState<string>('');
+  const [showForm, setShowForm] = useState(false);
 
   if (state.status === 'not-configured') {
     return (
@@ -33,14 +42,6 @@ export function CourseList() {
   }
 
   const { departments, courses } = state.data;
-  if (courses.length === 0) {
-    return (
-      <EmptyState
-        title="No courses yet"
-        description="You have no course assignments yet. Assignments are made by your university administrator."
-      />
-    );
-  }
 
   const filtered = departmentFilter
     ? courses.filter((c) => c.department_id === departmentFilter)
@@ -48,51 +49,80 @@ export function CourseList() {
 
   return (
     <div className="flex flex-col gap-4">
-      <label className="flex max-w-xs flex-col gap-1.5 text-[13px] font-medium text-ink">
-        Filter by department
-        <select
-          className="h-9 rounded-lg border border-line bg-surface px-3 text-sm text-ink"
-          value={departmentFilter}
-          onChange={(e) => setDepartmentFilter(e.target.value)}
-        >
-          <option value="">All departments</option>
-          {departments.map((dept) => (
-            <option key={dept.id} value={dept.id}>
-              {dept.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[13px] text-muted">
+          {courses.length === 0
+            ? 'No courses yet.'
+            : `${courses.length} course${courses.length === 1 ? '' : 's'}`}
+        </p>
+        {!showForm ? (
+          <Button type="button" onClick={() => setShowForm(true)}>
+            New course
+          </Button>
+        ) : null}
+      </div>
 
-      {filtered.length === 0 ? (
+      {showForm ? (
+        <CourseForm
+          onCreated={() => setRefreshKey((k) => k + 1)}
+          onCancel={() => setShowForm(false)}
+        />
+      ) : null}
+
+      {courses.length === 0 ? (
         <EmptyState
-          title="No courses in this department"
-          description="You have no course assignments in the selected department."
+          title="No courses yet"
+          description="You have no courses yet. Create your first course above — it will be assigned to you."
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((course) => (
-            <Card key={course.id}>
-              <CardHeader>
-                <CardTitle>
-                  {course.code} — {course.title}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-[13px] text-muted">
-                  {course.departmentName} · {course.semesterName}
-                </p>
-                <p className="mt-1 text-[13px] text-muted">
-                  Level {course.level}
-                  {course.credit_unit !== null
-                    ? ` · ${course.credit_unit} credit unit${course.credit_unit === 1 ? '' : 's'}`
-                    : ''}
-                  {` · ${course.academicSessionName}`}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <>
+          <label className="flex max-w-xs flex-col gap-1.5 text-[13px] font-medium text-ink">
+            Filter by department
+            <select
+              className="h-9 rounded-lg border border-line bg-surface px-3 text-sm text-ink"
+              value={departmentFilter}
+              onChange={(e) => setDepartmentFilter(e.target.value)}
+            >
+              <option value="">All departments</option>
+              {departments.map((dept) => (
+                <option key={dept.id} value={dept.id}>
+                  {dept.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {filtered.length === 0 ? (
+            <EmptyState
+              title="No courses in this department"
+              description="You have no course assignments in the selected department."
+            />
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {filtered.map((course) => (
+                <Card key={course.id}>
+                  <CardHeader>
+                    <CardTitle>
+                      {course.code} — {course.title}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-[13px] text-muted">
+                      {course.departmentName} · {course.semesterName}
+                    </p>
+                    <p className="mt-1 text-[13px] text-muted">
+                      Level {course.level}
+                      {course.credit_unit !== null
+                        ? ` · ${course.credit_unit} credit unit${course.credit_unit === 1 ? '' : 's'}`
+                        : ''}
+                      {` · ${course.academicSessionName}`}
+                    </p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

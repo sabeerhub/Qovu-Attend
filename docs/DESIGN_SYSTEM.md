@@ -71,8 +71,11 @@ internal padding.
 - **Sidebar (desktop):** 240px, `#f5f5f7` background, 15px nav items,
   active item is `#111111` text with a white pill background — not a
   colored bar.
-- **Mobile:** bottom or top navigation with the same 7 items, same
-  labels, no icons-only navigation.
+- **Mobile:** an iOS-style bottom tab bar on mobile (four tabs —
+  Overview, Courses, Sessions, History — plus a "More" tab that
+  opens a bottom sheet with My Departments, Reports & Exports,
+  Profile & Settings). Icons with labels, never icons-only;
+  active tab is the accent blue. Desktop keeps the sidebar.
 - **Status:** a 6px dot + label text.
 
 ## States (every screen must handle all four)

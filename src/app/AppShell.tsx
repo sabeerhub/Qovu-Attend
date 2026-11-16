@@ -72,7 +72,6 @@ export function AppShell() {
     <div className="flex min-h-screen bg-surface">
       <Sidebar current={current} onNavigate={setCurrent} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <MobileNav current={current} onNavigate={setCurrent} />
         <header className="flex items-center justify-between border-b border-line px-4 py-4 md:px-6">
           <h1 className="text-2xl font-semibold tracking-tight text-ink">{NAV_TITLES[current]}</h1>
           <Button
@@ -84,7 +83,7 @@ export function AppShell() {
             Sign out
           </Button>
         </header>
-        <main className="mx-auto w-full max-w-[1120px] px-4 py-6 md:px-6">
+        <main className="mx-auto w-full max-w-[1120px] px-4 py-6 pb-24 md:px-6 md:pb-6">
           {current === 'overview' ? <Overview /> : null}
           {current === 'departments' ? <DepartmentList /> : null}
           {current === 'courses' ? <CourseList /> : null}
@@ -93,6 +92,9 @@ export function AppShell() {
           {current === 'reports' ? <ReportsPanel /> : null}
           {current === 'profile' ? <ProfileScreen /> : null}
         </main>
+        {/* Fixed bottom tab bar on mobile; the pb-24 above keeps it
+            from ever covering content. Desktop uses the sidebar. */}
+        <MobileNav current={current} onNavigate={setCurrent} />
       </div>
     </div>
   );

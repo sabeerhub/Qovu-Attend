@@ -64,8 +64,11 @@ interface CourseRow extends Course {
  * semesters, rooms — is loaded through their rows in
  * `lecturer_assignments` (via RLS). Nothing unassigned is ever shown.
  * The profile is looked up by `user_id = auth.uid()`.
+ *
+ * `refreshKey` re-runs the load (e.g. after a course is created);
+ * it defaults to 0 and changes nothing for existing callers.
  */
-export function useAssignments(): AssignmentsState {
+export function useAssignments(refreshKey = 0): AssignmentsState {
   const [state, setState] = useState<AssignmentsState>({ status: 'loading' });
 
   useEffect(() => {
@@ -209,7 +212,7 @@ export function useAssignments(): AssignmentsState {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshKey]);
 
   return state;
 }

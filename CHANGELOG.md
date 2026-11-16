@@ -1,5 +1,55 @@
 # Changelog — UniAttend
 
+## v0.4.0 — 2026-11-16 — Lecturer-created courses + Apple-style mobile navigation
+
+- **Lecturer-created courses (spec change, product-owner decision 2026-11-16).**
+  Lecturers can now create a course from My Courses: department,
+  semester, code, title, level, credit units. This overrides the
+  Lecturer Dashboard spec v1.0 rule that courses are
+  admin-controlled. Creating a course also creates the lecturer's
+  own assignment to it, so the new course appears immediately.
+- New migration `supabase/migrations/20261116000000_lecturer_course_create.sql`
+  (existing migrations untouched): a `SECURITY DEFINER` RPC,
+  `create_lecturer_course(...)`, that resolves the caller's profile
+  from `auth.uid()`, validates everything server-side (department
+  and semester exist; code/title/level/credit-unit rules; the
+  unique `(department_id, code, semester_id)` rule with a clean
+  duplicate error), and inserts the course and the assignment
+  atomically. Executable by `authenticated` only. No direct client
+  insert policy on `courses` or `lecturer_assignments`.
+- The same migration loosens READ policies so any signed-in lecturer
+  can read reference data for the form's pickers: `departments`,
+  `semesters`, `academic_sessions`, `faculties`, `universities`.
+  Attendance data keeps the assignment-based policies.
+- Client: new pure `src/lib/courseForm.ts` (validation, RPC call,
+  server-error mapping), new `CourseForm` component with
+  loading/empty/error/success states (honest empty state when no
+  departments or semesters exist yet — no invented options), new
+  `useCourseReferenceData` hook, and a "New course" button on My
+  Courses with list refresh on success. `useAssignments` takes an
+  optional `refreshKey` (default 0; existing callers unchanged).
+- **Mobile navigation (Apple-style).** The horizontal scrolling pill
+  row is replaced by an iOS-style bottom tab bar (mobile only):
+  Overview, Courses, Sessions, History, plus a "More" tab opening a
+  bottom sheet with My Departments, Reports & Exports, Profile &
+  Settings. Lucide icons + labels (never icons-only), accent-blue
+  active state, white background, 1px top border, safe-area bottom
+  padding; Escape/backdrop/Cancel close the sheet. Desktop sidebar
+  unchanged. AppShell adds bottom padding so the bar never covers
+  content. Navigation grouping is pure and tested
+  (`src/lib/navigation.ts`).
+- Tests: 25 new tests (course-form validation, error mapping,
+  mocked-RPC create, navigation grouping); 124 tests total, all
+  passing. `tsc -b` + vite build green. Note: the bundle passed
+  500 kB minified (502.83 kB) with the first lucide-react imports,
+  so vite now prints its chunk-size warning; the extra weight is
+  the six tab/sheet icons plus the new code.
+- **Not verified live:** the new migration has not been applied to
+  the Supabase project (SQL Editor run needed), and the
+  `create_lecturer_course` RPC has not been executed against a live
+  database. The form's pickers only have options once departments
+  and semesters exist (seed or admin setup).
+
 ## v0.3.1 — 2026-11-15 — Environment variables hidden from the repo
 
 - Removed `.env.example` from the project entirely (no env file of any kind in the repo).
