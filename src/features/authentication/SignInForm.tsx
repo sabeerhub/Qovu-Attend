@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from 'react';
 import { supabase } from '@/lib/supabase';
+import { ensureLecturerProfile } from './lecturerProfile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 /** Lecturer sign-in, wired to Supabase Auth. No fake login. */
-export function SignInForm() {
+export function SignInForm({ onSignUp }: { onSignUp?: () => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -19,9 +20,19 @@ export function SignInForm() {
       return;
     }
     setLoading(true);
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
-    if (signInError) setError(signInError.message);
+    if (signInError) {
+      setError(signInError.message);
+      return;
+    }
+    // Best-effort: lecturers who signed up while email confirmation
+    // was on have an account but no profile row yet. Creating it
+    // here never blocks sign-in — if it fails, the dashboard shows
+    // the honest "no profile" state as before.
+    if (data.user) {
+      void ensureLecturerProfile(supabase, data.user);
+    }
   }
 
   return (
@@ -57,6 +68,14 @@ export function SignInForm() {
           <Button type="submit" disabled={loading} className="mt-1">
             {loading ? 'Signing in…' : 'Sign in'}
           </Button>
+          {onSignUp ? (
+            <p className="text-center text-[13px] text-muted">
+              New to Qovu?{' '}
+              <button type="button" className="font-medium text-accent" onClick={onSignUp}>
+                Create an account
+              </button>
+            </p>
+          ) : null}
         </form>
       </CardContent>
     </Card>

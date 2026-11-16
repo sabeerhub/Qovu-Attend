@@ -3,7 +3,8 @@ import { useAssignments } from '@/hooks/useAssignments';
 import { CourseForm } from './CourseForm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { EmptyState, ErrorState, LoadingState } from '@/components/ui/empty-state';
+import { EmptyState, ErrorState } from '@/components/ui/empty-state';
+import { CourseListSkeleton } from '@/components/ui/skeleton';
 
 /**
  * Courses the signed-in lecturer is assigned to, loaded through
@@ -30,7 +31,7 @@ export function CourseList() {
       />
     );
   }
-  if (state.status === 'loading') return <LoadingState label="Loading courses…" />;
+  if (state.status === 'loading') return <CourseListSkeleton />;
   if (state.status === 'error') return <ErrorState message={state.message} />;
   if (state.status === 'no-profile') {
     return (

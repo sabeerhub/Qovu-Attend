@@ -4,7 +4,8 @@ import { SessionForm } from './SessionForm';
 import { SessionList } from './SessionList';
 import { SessionMonitor, type ActivationResult } from './SessionMonitor';
 import { AcademicCalendarView } from '@/features/calendar/AcademicCalendarView';
-import { EmptyState, ErrorState, LoadingState } from '@/components/ui/empty-state';
+import { EmptyState, ErrorState } from '@/components/ui/empty-state';
+import { SessionWorkspaceSkeleton } from '@/components/ui/skeleton';
 import type { AttendanceSession } from '@/types/database';
 
 interface SelectedSession {
@@ -38,7 +39,7 @@ export function SessionWorkspace() {
       />
     );
   }
-  if (state.status === 'loading') return <LoadingState label="Loading sessions…" />;
+  if (state.status === 'loading') return <SessionWorkspaceSkeleton />;
   if (state.status === 'error') return <ErrorState message={state.message} />;
   if (state.status === 'no-profile') {
     return (

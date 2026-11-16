@@ -40,10 +40,10 @@ export function Sidebar({
 }) {
   return (
     <aside className="hidden w-60 shrink-0 flex-col bg-canvas px-3 py-6 md:flex">
-      <p className="px-3 pb-6">
+      <p className="px-3 pb-8">
         <QovuBrand markSize={22} textClassName="text-[17px]" />
       </p>
-      <nav aria-label="Lecturer portal" className="flex flex-col gap-0.5">
+      <nav aria-label="Lecturer portal" className="flex flex-col gap-1">
         {NAV_ITEMS.map((item) => (
           <button
             key={item.key}

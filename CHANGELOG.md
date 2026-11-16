@@ -1,5 +1,72 @@
 # Changelog — UniAttend
 
+## v0.7.0 — 2026-11-17 — Landing page, logo splash, lecturer sign-up, dashboard skeletons, desktop polish
+
+- **Logo splash on load (Phase A).** Opening any Qovu link first plays
+  a short premium intro: full-screen canvas white, the Q mark draws
+  itself in (ring, then tail, then the accent-blue dot), the "Qovu"
+  wordmark fades in, and the screen fades into the page — 1.3 s
+  total. The idea only is borrowed from sites like Stake (logo
+  animation first, then the page); the look stays light and
+  Apple-minimal, never their dark casino style. `prefers-reduced-motion`
+  skips it entirely, and the CSS end-state is `visibility: hidden`,
+  so the splash can never trap the page even if its timer fails.
+  New: `src/components/brand/LogoSplash.tsx`, `src/lib/splash.ts`,
+  keyframes in `src/styles/globals.css`, wired in `src/App.tsx`.
+- **Public landing page (Phase B).** Logged-out visitors at `/` now see
+  a landing page instead of the bare sign-in box: hero with the Qovu
+  mark and "Attendance, verified." tagline, plain words on what Qovu
+  does, "How it works" in three short steps (lecturer starts a
+  session, students mark themselves present, Qovu checks they are
+  really there), a minimal three-item features section (30 m location
+  check, one device per student, headcount cross-check), "Create
+  account" and "Sign in" buttons, and a minimal footer. Logged-in
+  lecturers skip it and go straight to the dashboard. Routing is a
+  tiny path router (`src/lib/authRoutes.ts`: `/` landing,
+  `/signin`, `/signup`, back button works); `/submit` and
+  `?submit=...` are decided first by the existing `getSubmitRoute`
+  and work exactly as before. New: `src/features/landing/LandingPage.tsx`.
+- **Lecturer sign-up (Phase C).** New sign-up page at `/signup`: full
+  name, email, password, confirm password, with plain inline client
+  validation (valid email, password at least 8 characters with a
+  letter and a number, passwords match — `src/lib/signupValidation.ts`).
+  On submit: Supabase Auth `signUp` with the name as user metadata,
+  then the lecturer profile row is created for the new user
+  (`src/features/authentication/lecturerProfile.ts`). No migration was
+  needed: the existing `lecturer_profiles_own` RLS policy (migration
+  20261115000000) is `FOR ALL` with `user_id = auth.uid()`, so an
+  authenticated user may already insert exactly their own row — never
+  anyone else's, no service-role key. Email confirmation is currently
+  OFF, so sign-up normally returns a session at once and the lecturer
+  lands on the dashboard; if confirmation is ever switched back on,
+  the form says to check email, and the profile row is created on the
+  first sign-in instead (SignInForm now calls the same helper, best
+  effort, never blocking sign-in). Sign-in and sign-up link to each
+  other. Open registration for now — invite-only is possible later.
+- **Skeleton loading on the dashboard (Phase D).** Overview, Courses
+  and Sessions list views now show skeleton placeholders (grey blocks
+  in the shape of the real content, calm opacity pulse) instead of
+  spinners or blank space. New: `src/components/ui/skeleton.tsx`
+  (`OverviewSkeleton`, `CourseListSkeleton`, `SessionListSkeleton`,
+  `SessionWorkspaceSkeleton`); the four loading branches in
+  `Overview.tsx`, `CourseList.tsx`, `SessionWorkspace.tsx` and
+  `SessionList.tsx` render them. No gradients — the pulse is opacity
+  only, per the design system. The auth-loading spinner in AppShell
+  is untouched.
+- **Desktop polish (Phase E).** Desktop layout only, mobile tab bar
+  unchanged: the dashboard header is now sticky with a little more
+  breathing room, main content has more top/bottom air on desktop
+  (`md:py-8`), sidebar brand spacing and nav rhythm loosened
+  slightly. No layout rebuild, no new colours, no gradients.
+- **Tests.** 229/229 green (was 211/211): splash timing (2),
+  auth routing (3), sign-up validation + profile-row builder (8),
+  skeleton presence via server render (5). Build green.
+- **Not verified live.** The sign-up flow (including the
+  email-confirmation-off behaviour) was verified only by unit tests
+  and the build — no live Supabase sign-up was performed in this
+  slice. The 1280px/1440px desktop polish was checked by CSS review
+  only, not by a visual screenshot.
+
 ## v0.6.0 — 2026-11-17 — The product is now Qovu: hand-built logo, favicon, in-app brand
 
 - **New name: Qovu (product-owner decision 2026-11-17).** The attendance

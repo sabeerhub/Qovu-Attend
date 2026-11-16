@@ -6,7 +6,8 @@ import { LocationAllowPanel, LocationBlockedPanel } from '@/components/ui/locati
 import type { AttendanceSession } from '@/types/database';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { EmptyState, ErrorState, LoadingState } from '@/components/ui/empty-state';
+import { EmptyState, ErrorState } from '@/components/ui/empty-state';
+import { SessionListSkeleton } from '@/components/ui/skeleton';
 import type { ActivationResult } from './SessionMonitor';
 
 interface SessionRow extends AttendanceSession {
@@ -55,7 +56,7 @@ export function SessionList({
     })();
   }, [refreshKey]);
 
-  if (state.status === 'loading') return <LoadingState label="Loading sessions…" />;
+  if (state.status === 'loading') return <SessionListSkeleton />;
   if (state.status === 'error') return <ErrorState message={state.message} />;
   if (state.sessions.length === 0) {
     return (

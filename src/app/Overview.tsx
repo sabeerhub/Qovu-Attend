@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useOverviewStats } from '@/hooks/useOverviewStats';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/badge';
-import { EmptyState, ErrorState, LoadingState } from '@/components/ui/empty-state';
+import { EmptyState, ErrorState } from '@/components/ui/empty-state';
+import { OverviewSkeleton } from '@/components/ui/skeleton';
 
 /**
  * Overview dashboard. Every number comes from a database query
@@ -23,7 +24,7 @@ export function Overview() {
       />
     );
   }
-  if (state.status === 'loading') return <LoadingState label="Loading overview…" />;
+  if (state.status === 'loading') return <OverviewSkeleton />;
   if (state.status === 'error') return <ErrorState message={state.message} />;
   if (state.status === 'no-profile') {
     return (
