@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
 import {
   CourseListSkeleton,
+  LecturePlanSkeleton,
   OverviewSkeleton,
   SessionListSkeleton,
   SessionWorkspaceSkeleton,
@@ -35,11 +36,18 @@ describe('dashboard skeletons (v0.7.0)', () => {
     expect(html).toContain('Your sessions');
   });
 
+  it('renders the lecture plan skeleton with its weekday sections', () => {
+    const html = renderToString(createElement(LecturePlanSkeleton));
+    expect(html).toContain('skeleton');
+    expect(html).toContain('Loading your plan');
+  });
+
   it('never shows a spinner while skeleton loading', () => {
     for (const html of [
       renderToString(createElement(OverviewSkeleton)),
       renderToString(createElement(CourseListSkeleton)),
       renderToString(createElement(SessionListSkeleton)),
+      renderToString(createElement(LecturePlanSkeleton)),
     ]) {
       expect(html).not.toContain('animate-spin');
     }

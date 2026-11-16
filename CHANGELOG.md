@@ -1,5 +1,68 @@
 # Changelog — UniAttend
 
+## v0.8.0 — 2026-11-17 — My Lecture Plan (weekly timetable, one-tap sessions)
+
+- **Why (Phase 1–2).** In Nigerian universities a lecturer teaches
+  across departments and levels, each with their own plan. My Lecture
+  Plan gives every lecturer their own weekly timetable (Monday to
+  Saturday) and one tap turns a planned lecture into a live session —
+  no re-entering course, date and time every week. Each lecturer sees
+  only their own plan.
+- **Data model (Phase 1).** New migration
+  `supabase/migrations/20261117030000_lecture_plans.sql` (user-facing
+  copy: `~/workspace/your_files/uniattend-migration-lecture-plans.sql`
+  — run it in the Supabase SQL Editor; the migration has NOT been
+  applied live yet). Table `lecture_plans`: lecturer, course, weekday
+  1–6, start time, optional end time (CHECK: after start time),
+  optional free-text room (≤ 80 chars), unique
+  `(lecturer, course, day, start_time)` so the same lecture cannot be
+  planned twice. RLS: own rows only for select/update/delete; NO
+  direct insert policy.
+- **Server-side ownership (Phase 2).** New SECURITY DEFINER RPC
+  `create_lecture_plan` (same pattern as `create_lecturer_course`):
+  resolves the lecturer from the auth session, validates day/time/
+  room server-side, refuses any course the caller is not assigned to
+  (`course_not_assigned`), maps duplicates to
+  `lecture_plan_duplicate`. The update policy's WITH CHECK also
+  re-verifies course ownership, so an entry can never be repointed
+  at someone else's course. Cascade decision: deleting a course
+  deletes its plan entries (a plan entry is meaningless without its
+  course).
+- **My Plan screen (Phase 3).** New nav entry "My Lecture Plan"
+  (desktop sidebar after My Courses; mobile More sheet — 8 sections
+  now, tab bar unchanged). Weekly view Mon–Sat with plain cards
+  (time, course code + title, department, level, room), add/edit
+  form (one of my courses, day, start/end time, room), two-tap
+  delete, empty state in plain words, `LecturePlanSkeleton` while
+  loading. New: `src/features/plan/LecturePlanScreen.tsx`,
+  `src/features/plan/LecturePlanForm.tsx`, `src/lib/lecturePlan.ts`
+  (weekday math, validation, grouping, plan→session mapping).
+- **One tap to a live session (Phase 4).** "Start session" on a plan
+  entry creates a Draft via the shared `createDraftSession`
+  (`src/lib/sessionCreation.ts`, extracted from `SessionForm` — the
+  form now uses it too, and `SessionList` uses the same select
+  constant, so a created session opens without a second query):
+  date = next occurrence of the entry's weekday (today when it is
+  today, never a past date), start time from the plan, week suggested
+  from the course semester (else 1), title = course title. AppShell
+  hands the created draft to `SessionWorkspace`, which opens it
+  straight into the monitor to review the headcount and activate.
+- **Tests:** 257 passing (was 229), 24 files. New:
+  `tests/unit/lecture-plan.test.ts` (23 tests: weekday math incl.
+  Sunday→Monday, validation incl. end-after-start, grouping,
+  plan→session mapping incl. next-week dates and week fallback),
+  `tests/unit/session-creation.test.ts` (4 tests: insert payload,
+  title trim, error paths). Navigation + skeleton tests updated for
+  the 8th section.
+- **Docs:** `docs/DATABASE_SCHEMA.md` (lecture_plans table + RLS
+  note), README nav count 7 → 8.
+- **Still not verified:** the migration has NOT been applied to a
+  live Supabase project — run
+  `~/workspace/your_files/uniattend-migration-lecture-plans.sql` in
+  the SQL Editor first, then confirm `create_lecture_plan` exists;
+  until then the My Plan screen will show a load error, and "Start
+  session" cannot work. No live browser test of the screen yet.
+
 ## v0.7.0 — 2026-11-17 — Landing page, logo splash, lecturer sign-up, dashboard skeletons, desktop polish
 
 - **Logo splash on load (Phase A).** Opening any Qovu link first plays

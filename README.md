@@ -87,7 +87,7 @@ Done:
 
 - Full directory tree, docs (9 docs + the Lecturer Dashboard spec),
   12-table migration with constraints + RLS sketch, example-only seed.
-- App shell with all 7 navigation sections, Apple-minimalist design
+- App shell with all 8 navigation sections, Apple-minimalist design
   system (see `docs/DESIGN_SYSTEM.md`).
 - Real Supabase Auth sign-in and a Profile & Settings screen that
   loads the signed-in lecturer's row from `lecturer_profiles`

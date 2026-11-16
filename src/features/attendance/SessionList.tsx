@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { transitionSession } from '@/lib/edgeFunctions';
+import { DRAFT_SESSION_SELECT } from '@/lib/sessionCreation';
 import { locationErrorMessage, nextLocationStep, queryLocationPermission, requestDeviceLocation, type LocationPermissionState } from '@/lib/geo';
 import { LocationAllowPanel, LocationBlockedPanel } from '@/components/ui/location-permission';
 import type { AttendanceSession } from '@/types/database';
@@ -44,9 +45,7 @@ export function SessionList({
       try {
         const { data, error } = await supabase
           .from('attendance_sessions')
-          .select(
-            'id, course_id, lecturer_id, semester_id, lecture_room_id, title, lecture_date, start_time, week_number, headcount, qr_expires_in_seconds, status, created_at, updated_at, anchor_latitude, anchor_longitude, anchor_accuracy_meters, anchor_captured_at, location_radius_meters, courses(code)',
-          )
+          .select(DRAFT_SESSION_SELECT)
           .order('lecture_date', { ascending: false });
         if (error) setState({ status: 'error', message: error.message });
         else setState({ status: 'ready', sessions: (data ?? []) as unknown as SessionRow[] });

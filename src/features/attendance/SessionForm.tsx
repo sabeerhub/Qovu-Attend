@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { supabase } from '@/lib/supabase';
 import { isValidWeekNumber, weekOptions } from '@/lib/attendance';
 import { weekForDate } from '@/lib/calendar';
+import { createDraftSession } from '@/lib/sessionCreation';
 import {
   QR_EXPIRY_OPTIONS,
   hasSessionFormErrors,
@@ -121,22 +122,21 @@ export function SessionForm({
       return;
     }
     setLoading(true);
-    const { error: insertError } = await supabase.from('attendance_sessions').insert({
-      course_id: selectedCourse.id,
-      lecturer_id: lecturerId,
-      semester_id: selectedCourse.semester_id,
-      lecture_room_id: lectureRoomId === '' ? null : lectureRoomId,
-      title: title.trim(),
-      lecture_date: lectureDate,
-      start_time: startTime,
-      week_number: weekNumber,
+    const result = await createDraftSession(supabase, {
+      courseId: selectedCourse.id,
+      lecturerId,
+      semesterId: selectedCourse.semester_id,
+      lectureRoomId: lectureRoomId === '' ? null : lectureRoomId,
+      title,
+      lectureDate,
+      startTime,
+      weekNumber,
       headcount: headcount === '' ? null : Number(headcount),
-      qr_expires_in_seconds: qrExpiresInSeconds,
-      status: 'draft',
+      qrExpiresInSeconds,
     });
     setLoading(false);
-    if (insertError) {
-      setError(insertError.message);
+    if ('error' in result) {
+      setError(result.error);
       return;
     }
     setSuccess(true);

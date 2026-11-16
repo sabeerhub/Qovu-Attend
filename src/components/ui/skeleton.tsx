@@ -154,3 +154,31 @@ export function SessionWorkspaceSkeleton() {
     </div>
   );
 }
+
+/** Mirrors the lecture plan: header row + two weekday sections of entry cards. */
+export function LecturePlanSkeleton() {
+  return (
+    <div className="flex flex-col gap-6" aria-label="Loading your plan">
+      <LoadingLabel label="Loading your plan…" />
+      <div className="flex items-center justify-between gap-2">
+        <Block className="h-3.5 w-32" />
+        <Block className="h-9 w-28" />
+      </div>
+      {[0, 1].map((section) => (
+        <section key={section}>
+          <Block className="mb-3 h-5 w-24" />
+          <div className="flex flex-col gap-3">
+            {[0, 1].map((row) => (
+              <Card key={row}>
+                <CardContent className="flex flex-col gap-2 pt-6">
+                  <Block className="h-4 w-3/4" />
+                  <Block className="h-3.5 w-1/2" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}

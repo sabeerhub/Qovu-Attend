@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAssignments } from '@/hooks/useAssignments';
 import { SessionForm } from './SessionForm';
 import { SessionList } from './SessionList';
@@ -26,10 +26,31 @@ interface SelectedSession {
  * the lifecycle controls. Activating a Draft from the list opens the
  * monitor with the QR code + passcode shown once.
  */
-export function SessionWorkspace() {
+export function SessionWorkspace({
+  initialSession,
+  onInitialSessionConsumed,
+}: {
+  /**
+   * A session created elsewhere (My Lecture Plan's "Start session")
+   * to open straight into the monitor. Consumed once, then cleared
+   * by the caller via onInitialSessionConsumed.
+   */
+  initialSession?: { session: AttendanceSession; courseCode: string | null } | null;
+  onInitialSessionConsumed?: () => void;
+}) {
   const [refreshKey, setRefreshKey] = useState(0);
   const [selected, setSelected] = useState<SelectedSession | null>(null);
   const state = useAssignments();
+
+  useEffect(() => {
+    if (!initialSession) return;
+    setSelected({
+      session: initialSession.session,
+      courseCode: initialSession.courseCode,
+      activation: null,
+    });
+    onInitialSessionConsumed?.();
+  }, [initialSession, onInitialSessionConsumed]);
 
   if (state.status === 'not-configured') {
     return (

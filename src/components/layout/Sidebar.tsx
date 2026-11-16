@@ -17,6 +17,7 @@ export const NAV_ITEMS: Array<{ key: NavKey; label: string }> = [
   { key: 'overview', label: 'Overview' },
   { key: 'departments', label: 'My Departments' },
   { key: 'courses', label: 'My Courses' },
+  { key: 'plan', label: 'My Lecture Plan' },
   { key: 'sessions', label: 'Attendance Sessions' },
   { key: 'history', label: 'Attendance History' },
   { key: 'reports', label: 'Reports & Exports' },
@@ -72,8 +73,8 @@ export function Sidebar({
  * Mobile navigation (iOS-style bottom tab bar, mobile only).
  *
  * Four tabs — Overview, Courses, Sessions, History — plus a "More"
- * tab that opens a bottom sheet with My Departments, Reports &
- * Exports, and Profile & Settings. Active tab is the accent blue;
+ * tab that opens a bottom sheet with My Departments, My Lecture Plan,
+ * Reports & Exports, and Profile & Settings. Active tab is the accent blue;
  * inactive tabs are muted grey. Labels are always shown next to
  * the icons (never icons-only). The bar is fixed to the bottom of
  * the viewport; AppShell adds bottom padding to the content so the

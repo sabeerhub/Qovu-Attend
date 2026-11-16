@@ -88,6 +88,24 @@ export interface LectureRoom {
   created_at: string;
 }
 
+/**
+ * My Lecture Plan (v0.8.0): one row of a lecturer's own weekly
+ * timetable. day_of_week is 1 = Monday .. 6 = Saturday. start_time
+ * and end_time are HH:MM:SS strings from Postgres `time` columns.
+ * A plan entry is deleted with its course (ON DELETE CASCADE).
+ */
+export interface LecturePlan {
+  id: string;
+  lecturer_id: string;
+  course_id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string | null;
+  room: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface AttendanceSession {
   id: string;
   course_id: string;

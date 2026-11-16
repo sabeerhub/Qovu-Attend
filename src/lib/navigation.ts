@@ -3,7 +3,7 @@
  *
  * Mobile uses an iOS-style bottom tab bar with four tabs and a
  * "More" tab that opens a bottom sheet with the remaining sections.
- * Every one of the 7 nav sections appears exactly once across the
+ * Every one of the 8 nav sections appears exactly once across the
  * tab bar and the sheet — nothing is hidden, nothing is duplicated.
  */
 import type { NavKey } from '@/app/routes';
@@ -27,6 +27,7 @@ export const TAB_BAR_ITEMS: Array<{ key: TabBarKey; label: string }> = [
 /** The sections behind the "More" tab, shown in the bottom sheet. */
 export const MORE_SHEET_ITEMS: MobileNavItem[] = [
   { key: 'departments', label: 'My Departments' },
+  { key: 'plan', label: 'My Lecture Plan' },
   { key: 'reports', label: 'Reports & Exports' },
   { key: 'profile', label: 'Profile & Settings' },
 ];

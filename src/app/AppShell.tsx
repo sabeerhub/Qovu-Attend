@@ -13,7 +13,9 @@ import { SubmitAttendance } from '@/features/submission/SubmitAttendance';
 import { SubmitEntry } from '@/features/submission/SubmitEntry';
 import { DepartmentList } from '@/features/departments/DepartmentList';
 import { CourseList } from '@/features/courses/CourseList';
+import { LecturePlanScreen } from '@/features/plan/LecturePlanScreen';
 import { SessionWorkspace } from '@/features/attendance/SessionWorkspace';
+import type { CreatedDraftSession } from '@/lib/sessionCreation';
 import { HistoryList } from '@/features/history/HistoryList';
 import { ReportsPanel } from '@/features/reports/ReportsPanel';
 import { ProfileScreen } from '@/features/profile/ProfileScreen';
@@ -24,6 +26,11 @@ import { EmptyState, LoadingState } from '@/components/ui/empty-state';
 export function AppShell() {
   const [current, setCurrent] = useState<NavKey>('overview');
   const auth = useAuth();
+
+  // A draft session just created from My Lecture Plan: the Sessions
+  // screen opens it straight into the monitor, so the lecturer
+  // reviews the headcount and activates without hunting the list.
+  const [pendingSession, setPendingSession] = useState<CreatedDraftSession | null>(null);
 
   // Lecturer-portal auth view (v0.7.0): the landing page at `/`,
   // sign-in at `/signin`, sign-up at `/signup`. The view is kept in
@@ -140,7 +147,27 @@ export function AppShell() {
           {current === 'overview' ? <Overview /> : null}
           {current === 'departments' ? <DepartmentList /> : null}
           {current === 'courses' ? <CourseList /> : null}
-          {current === 'sessions' ? <SessionWorkspace /> : null}
+          {current === 'plan' ? (
+            <LecturePlanScreen
+              onOpenSession={(session) => {
+                setPendingSession(session);
+                setCurrent('sessions');
+              }}
+            />
+          ) : null}
+          {current === 'sessions' ? (
+            <SessionWorkspace
+              initialSession={
+                pendingSession
+                  ? {
+                      session: pendingSession,
+                      courseCode: pendingSession.courses?.code ?? null,
+                    }
+                  : null
+              }
+              onInitialSessionConsumed={() => setPendingSession(null)}
+            />
+          ) : null}
           {current === 'history' ? <HistoryList /> : null}
           {current === 'reports' ? <ReportsPanel /> : null}
           {current === 'profile' ? <ProfileScreen /> : null}

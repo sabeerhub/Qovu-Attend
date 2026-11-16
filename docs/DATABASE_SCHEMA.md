@@ -118,6 +118,21 @@ via the unique constraint. See `docs/API_CONTRACTS.md`.
 | longitude | double precision | Phase 4 GPS; nullable |
 | created_at | timestamptz, default now() | |
 
+### lecture_plans (v0.8.0 — My Lecture Plan)
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| lecturer_id | uuid FK → lecturer_profiles, not null, cascade delete | the plan's owner |
+| course_id | uuid FK → courses, not null, cascade delete | deleting a course deletes its plan entries |
+| day_of_week | smallint, not null | 1 = Monday .. 6 = Saturday; check 1–6 |
+| start_time | time, not null | |
+| end_time | time, nullable | check end_time > start_time when set |
+| room | text, nullable | free-text venue, ≤ 80 chars |
+| created_at | timestamptz, default now() | |
+| updated_at | timestamptz, default now() | |
+
+Unique `(lecturer_id, course_id, day_of_week, start_time)` — the same lecture cannot be planned twice. Indexes on `lecturer_id` and `course_id`.
+
 ### attendance_sessions
 | Column | Type | Notes |
 |---|---|---|
@@ -225,3 +240,11 @@ role only, via the Edge Functions). The anchor columns on
 `attendance_sessions` and `device_fingerprint_hash` on
 `attendance_records` are written only by the Edge Functions, never
 by the client directly.
+
+v0.8.0 addition (`20261117030000_lecture_plans.sql`): the
+`lecture_plans` table (see below). A lecturer reads, updates and
+deletes only their own rows (`lecturer_id =
+current_lecturer_id()`); there is no direct client insert policy —
+inserts go through the `create_lecture_plan` RPC, which refuses any
+course the caller is not assigned to. The update policy's WITH
+CHECK also re-verifies course ownership on the new row.
