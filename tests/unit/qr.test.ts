@@ -6,6 +6,7 @@ import {
   generatePasscode,
   generateQrToken,
   isTokenExpired,
+  isValidPasscode,
   tokenRemainingSeconds,
 } from '@/lib/qr';
 
@@ -36,6 +37,22 @@ describe('classroom passcode generation', () => {
   it('generates varying passcodes', () => {
     const codes = new Set(Array.from({ length: 50 }, () => generatePasscode()));
     expect(codes.size).toBeGreaterThan(1);
+  });
+});
+
+describe('classroom passcode validation', () => {
+  it('accepts exactly six digits (and trims surrounding space)', () => {
+    expect(isValidPasscode('123456')).toBe(true);
+    expect(isValidPasscode(' 123456 ')).toBe(true);
+    expect(isValidPasscode(generatePasscode())).toBe(true);
+  });
+
+  it('rejects anything that is not exactly six digits', () => {
+    expect(isValidPasscode('')).toBe(false);
+    expect(isValidPasscode('12345')).toBe(false);
+    expect(isValidPasscode('1234567')).toBe(false);
+    expect(isValidPasscode('12345a')).toBe(false);
+    expect(isValidPasscode('abcdef')).toBe(false);
   });
 });
 

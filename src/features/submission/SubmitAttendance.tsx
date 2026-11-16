@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { buildIdempotencyKey, isValidRegistrationNumber, normalizeRegistrationNumber } from '@/lib/submission';
+import { buildIdempotencyKey, isValidRegistrationNumber, newIdempotencyKey, normalizeRegistrationNumber } from '@/lib/submission';
 import { getSubmitParams, submitAttendance } from '@/lib/edgeFunctions';
 import { locationErrorMessage, nextLocationStep, queryLocationPermission, requestDeviceLocation } from '@/lib/geo';
 import { LocationAllowPanel, LocationBlockedPanel } from '@/components/ui/location-permission';
@@ -16,8 +16,9 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/ui/empty-stat
 /**
  * Public attendance submission — no student account, no sign-in.
  * Reached at `?submit=<sessionId>&token=<token>` (the link the QR
- * code encodes). Without a token in the URL, the student enters the
- * classroom passcode instead.
+ * code encodes) or from the /submit entry page with the classroom
+ * passcode already entered (v0.5.4). Without a token in the URL, the
+ * student enters the classroom passcode instead.
  *
  * It asks only for a registration number. It shows no session details
  * and no other session's data: the session is identified server-side
@@ -33,10 +34,16 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/ui/empty-stat
  * server-side. Both checks apply identically to the QR-token path
  * and the passcode path.
  */
-export function SubmitAttendance() {
-  const params = typeof window !== 'undefined' ? getSubmitParams(window.location.search) : null;
+export function SubmitAttendance(props?: { passcode?: string }) {
+  const urlParams = typeof window !== 'undefined' ? getSubmitParams(window.location.search) : null;
+  // Passcode-only (v0.5.4): the student came from the /submit entry
+  // page with the code already entered. There is no session id yet —
+  // the server resolves the session from the passcode hash.
+  const passcodeOnly = typeof props?.passcode === 'string' && props.passcode.length > 0;
+  const sessionId = urlParams?.sessionId ?? null;
+  const token = urlParams?.token ?? null;
   const [registrationNumber, setRegistrationNumber] = useState('');
-  const [passcode, setPasscode] = useState('');
+  const [passcode, setPasscode] = useState(props?.passcode ?? '');
   const [state, setState] = useState<
     | { status: 'form' }
     | { status: 'submitting' }
@@ -54,7 +61,9 @@ export function SubmitAttendance() {
   // Per-browser hint only (localStorage): this browser already
   // submitted for a registration number in this session. The server
   // enforces device binding; this is just a heads-up, never a block.
-  const browserFlag = params ? readSubmittedFlag(params.sessionId) : null;
+  // Unavailable in the passcode-only flow — there is no session id
+  // until the server resolves one.
+  const browserFlag = sessionId ? readSubmittedFlag(sessionId) : null;
 
   if (!isSupabaseConfigured) {
     return (
@@ -71,7 +80,7 @@ export function SubmitAttendance() {
     );
   }
 
-  if (!params) {
+  if (!urlParams && !passcodeOnly) {
     return (
       <div className="mx-auto w-full max-w-md px-4 py-10">
         <h1 className="text-2xl font-semibold tracking-tight text-ink">UniAttend</h1>
@@ -93,13 +102,12 @@ export function SubmitAttendance() {
       setFormError('Enter your registration number.');
       return;
     }
-    const token = params?.token ?? null;
     const trimmedPasscode = passcode.trim();
     if (!token && trimmedPasscode.length === 0) {
       setFormError('Enter the classroom passcode shown by your lecturer.');
       return;
     }
-    if (!params) return;
+    if (!urlParams && !passcodeOnly) return;
     await startLocationFlow();
   }
 
@@ -123,7 +131,7 @@ export function SubmitAttendance() {
   }
 
   async function submitWithLocation() {
-    if (!params) return;
+    if (!urlParams && !passcodeOnly) return;
     // Re-check the inputs: the Allow tap happens after validation,
     // but the values may have changed since.
     if (!isValidRegistrationNumber(registrationNumber)) {
@@ -131,7 +139,6 @@ export function SubmitAttendance() {
       setFormError('Enter your registration number.');
       return;
     }
-    const token = params.token ?? null;
     const trimmedPasscode = passcode.trim();
     if (!token && trimmedPasscode.length === 0) {
       setLocationGate(null);
@@ -170,11 +177,20 @@ export function SubmitAttendance() {
     }
     setProgress('Submitting your attendance…');
     const result = await submitAttendance({
-      sessionId: params.sessionId,
+      // Passcode-only (v0.5.4): no session id — the server resolves
+      // the session from the passcode hash. The key is omitted from
+      // the JSON body when undefined.
+      sessionId: sessionId ?? undefined,
       registrationNumber: normalized,
       token: token ?? undefined,
       passcode: token ? undefined : trimmedPasscode,
-      idempotencyKey: buildIdempotencyKey(params.sessionId, normalized),
+      // Without a session id the stable per-(session, student) key
+      // cannot be built; use an attempt-scoped key instead. A retry
+      // is still deduplicated server-side by the unique constraint
+      // on (session_id, registration_number).
+      idempotencyKey: sessionId
+        ? buildIdempotencyKey(sessionId, normalized)
+        : newIdempotencyKey(),
       latitude: location.coords.latitude,
       longitude: location.coords.longitude,
       accuracy: location.coords.accuracy,
@@ -185,7 +201,7 @@ export function SubmitAttendance() {
       setState({ status: 'error', code: result.error.code, message: result.error.message });
       return;
     }
-    writeSubmittedFlag(params.sessionId, normalized);
+    if (sessionId) writeSubmittedFlag(sessionId, normalized);
     setState({
       status: 'success',
       registrationNumber: normalized,
@@ -281,7 +297,7 @@ export function SubmitAttendance() {
               autoComplete="off"
             />
           </label>
-          {!params.token ? (
+          {!token && !passcodeOnly ? (
             <label className="flex flex-col gap-1.5 text-[13px] font-medium text-ink">
               Classroom passcode
               <Input

@@ -119,6 +119,13 @@ it directly; see `src/lib/qr.ts` `buildSubmitUrl`). Without a
 instead. The page asks only for a registration number and shows no
 session details or other sessions' data.
 
+Since v0.5.4 there is also a passcode entry page at `/submit` (no
+session in the URL) for students who cannot scan the QR code: the
+student types the 6-digit code the lecturer is showing, then the same
+attendance form appears. The code is checked for format on the entry
+page and verified server-side at submission — there is no separate
+"does this code exist" check before the form.
+
 Request:
 
 ```json
@@ -136,9 +143,27 @@ Request:
 ```
 
 `token` and `passcode` are alternatives — at least one is required.
-`idempotencyKey` is the stable per-(session, student) key built by
+`sessionId` is required except in the passcode-only flow, where it
+may be omitted: the server then resolves the session from
+SHA-256(passcode) among ACTIVE sessions (see below). `idempotencyKey`
+is the stable per-(session, student) key built by
 `buildIdempotencyKey` in `src/lib/submission.ts`; a retry with the same
-key returns the original record instead of creating a second row.
+key returns the original record instead of creating a second row. In
+the passcode-only flow the client has no session id, so it sends an
+attempt-scoped random key (`newIdempotencyKey`); a retry is still
+deduplicated server-side by the unique constraint on
+(session_id, registration_number).
+
+Passcode-only session resolution (v0.5.4): when `sessionId` is
+omitted and a passcode is supplied, the server looks up the session
+by SHA-256(passcode) with `status = 'active'`. Exactly one match
+proceeds with every other check unchanged (expiry, location anchor /
+radius / accuracy, device binding, duplicate, headcount flag, rate
+limit). Zero matches or more than one match is rejected as
+`invalid_token` — the caller is never told how many matched — and a
+passcode is never accepted for a Draft, Closed, Finalized or Archived
+session. Note: there is no index on `passcode_hash`, so the lookup
+scans `attendance_sessions` (one row per lecture session — small).
 
 Phase 4 (v0.5.0) — location and device are mandatory on every
 submission, on both the QR-token path and the passcode path.
@@ -172,10 +197,10 @@ Errors:
 
 | HTTP | code | Meaning |
 |---|---|---|
-| 400 | `invalid_request` | Missing sessionId / registrationNumber, or neither token nor passcode supplied; or a malformed fingerprint / accuracy |
+| 400 | `invalid_request` | Missing registrationNumber, or neither sessionId nor passcode supplied; or a malformed fingerprint / accuracy |
 | 400 | `location_required` | No student coordinates supplied — location is mandatory |
 | 400 | `location_too_imprecise` | Reported accuracy worse than 100 m |
-| 401 | `invalid_token` | Token/passcode hash does not match the session |
+| 401 | `invalid_token` | Token/passcode hash does not match the session; in the passcode-only flow also when zero or more than one active session matches the passcode |
 | 403 | `outside_location` | Student is more than 30 m from the lecturer anchor |
 | 403 | `device_bound_to_another_student` | Device is already bound to a different registration number |
 | 404 | `session_not_found` | No such session |

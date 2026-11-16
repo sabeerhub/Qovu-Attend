@@ -51,6 +51,11 @@ export function generatePasscode(): string {
   return String(100000 + (value % 900000));
 }
 
+/** True when the string is exactly six digits — the classroom passcode format. */
+export function isValidPasscode(raw: string): boolean {
+  return /^\d{6}$/.test(raw.trim());
+}
+
 /** True when the token's server-side lifetime has elapsed. */
 export function isTokenExpired(
   issuedAt: string | Date,

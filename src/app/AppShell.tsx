@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { getSubmitParams } from '@/lib/edgeFunctions';
+import { getSubmitRoute } from '@/lib/edgeFunctions';
 import { useAuth } from '@/hooks/useAuth';
 import { NAV_TITLES, type NavKey } from './routes';
 import { Overview } from './Overview';
 import { MobileNav, Sidebar } from '@/components/layout/Sidebar';
 import { SignInForm } from '@/features/authentication/SignInForm';
 import { SubmitAttendance } from '@/features/submission/SubmitAttendance';
+import { SubmitEntry } from '@/features/submission/SubmitEntry';
 import { DepartmentList } from '@/features/departments/DepartmentList';
 import { CourseList } from '@/features/courses/CourseList';
 import { SessionWorkspace } from '@/features/attendance/SessionWorkspace';
@@ -20,15 +21,26 @@ export function AppShell() {
   const [current, setCurrent] = useState<NavKey>('overview');
   const auth = useAuth();
 
-  // Public student submission (?submit=<sessionId>&token=<token>) is
-  // rendered without sign-in and before any auth gate. It asks only
-  // for a registration number and exposes no other session's data.
-  const submitParams =
-    typeof window !== 'undefined' ? getSubmitParams(window.location.search) : null;
-  if (submitParams) {
+  // Public student submission is rendered without sign-in and
+  // before any auth gate. A QR link (`?submit=<sessionId>`) shows
+  // the attendance form; `/submit` with no session shows the
+  // passcode entry page (v0.5.4). Both ask only for a registration
+  // number and expose no other session's data.
+  const submitRoute =
+    typeof window !== 'undefined'
+      ? getSubmitRoute(window.location.pathname, window.location.search)
+      : null;
+  if (submitRoute?.kind === 'session') {
     return (
       <div className="min-h-screen bg-surface">
         <SubmitAttendance />
+      </div>
+    );
+  }
+  if (submitRoute?.kind === 'entry') {
+    return (
+      <div className="min-h-screen bg-surface">
+        <SubmitEntry />
       </div>
     );
   }

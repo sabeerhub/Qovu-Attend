@@ -1,5 +1,48 @@
 # Changelog — UniAttend
 
+## v0.5.4 — 2026-11-16 — Students without a camera can submit at /submit with the 6-digit code
+
+- **Passcode entry page (v0.5.4, product-owner request: a student who cannot
+  scan the QR code should be able to go to `/submit`, type the code, and
+  submit attendance).** Opening `/submit` with no session in the URL now
+  shows a simple page — "Enter the code your lecturer is showing" — with a
+  6-digit passcode field and a Continue button. After the code, the existing
+  attendance form appears (registration number, then the same location +
+  device checks as the QR path). The QR-link flow
+  (`?submit=<sessionId>&token=<token>`) is untouched.
+- **Passcode-only session resolution (server, `attendance-submit`).** The
+  function already verified a passcode, but only after the session was
+  identified by `sessionId` from the URL — a student with only the code
+  could not reach a session. Now `sessionId` may be omitted when a passcode
+  is supplied: the server finds the session by SHA-256(passcode) among
+  ACTIVE sessions. Exactly one match proceeds with every existing check
+  unchanged (expiry, location anchor/radius/accuracy, device binding,
+  duplicate, headcount flag, rate limit). Zero matches or more than one
+  match is rejected as `invalid_token` — the caller is never told how many
+  matched — and a passcode is never accepted for a Draft, Closed,
+  Finalized or Archived session. The client sends no `sessionId` in this
+  flow and uses an attempt-scoped idempotency key (the stable
+  per-(session, student) key needs a session id); a retry is still
+  deduplicated server-side by the unique constraint on
+  (session_id, registration_number).
+- **Honest notes.** The code is checked for format on the entry page and
+  verified server-side at submission — there is no separate "does this
+  code exist" check before the form, because no such endpoint exists and
+  none was added. The entry page therefore reports a wrong code the same
+  way the existing passcode path does. There is no index on
+  `passcode_hash`, so the lookup scans `attendance_sessions` (one row per
+  lecture session — small); no migration was added for this slice.
+- Client: `src/features/submission/SubmitEntry.tsx` (new),
+  `src/features/submission/SubmitAttendance.tsx` (optional `passcode` prop,
+  session-optional submit), `src/app/AppShell.tsx` (routes via
+  `getSubmitRoute`), `src/lib/edgeFunctions.ts` (`getSubmitRoute`,
+  optional `sessionId` in `SubmitAttendanceInput`), `src/lib/qr.ts`
+  (`isValidPasscode`); server: `supabase/functions/attendance-submit/index.ts`
+  (passcode-only resolution) + `resolveSession.ts` (new, dependency-free
+  resolver); tests: `tests/unit/submit-route.test.ts` (new),
+  `tests/unit/passcode-resolution.test.ts` (new), `tests/unit/qr.test.ts`,
+  `tests/integration/edge-functions.test.ts`.
+
 ## v0.5.3 — 2026-11-16 — Old submission links no longer show "This page doesn't exist"
 
 - **SPA rewrite added (v0.5.3, product-owner report: an old submission link

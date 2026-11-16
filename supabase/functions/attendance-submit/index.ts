@@ -1,15 +1,22 @@
 // attendance-submit — public student attendance submission (Phase 2,
 // smart verification added Phase 4 v0.5.0).
 //
-// POST { sessionId, registrationNumber, token?, passcode?, idempotencyKey,
+// POST { sessionId?, registrationNumber, token?, passcode?, idempotencyKey,
 //        latitude, longitude, accuracy?, deviceFingerprint }
 // No student account and no Authorization header are required: the
 // caller is authorized by the short-lived QR token (from scanning the
 // lecturer's QR code) or the classroom passcode — at least one must be
 // supplied. The client never submits a status; the server derives it.
 //
+// Since v0.5.4, `sessionId` may be omitted when a passcode is
+// supplied (the /submit entry page): the server then resolves the
+// session from SHA-256(passcode) among ACTIVE sessions — exactly
+// one match, or `invalid_token` (see resolveSession.ts).
+//
 // Server-side checks, in order:
 //   1. Session exists and status is 'active' (anything else: 409 session_not_active).
+//      With no sessionId, the session is resolved from the passcode
+//      hash first (zero or several matches: 401 invalid_token).
 //   2. Credential: SHA-256(token) === qr_token_hash, or
 //      SHA-256(passcode) === passcode_hash. Hashes are compared in
 //      constant time in effect (fixed-length hex equality).
@@ -77,6 +84,11 @@ import {
   normalizeRegistrationNumber,
   sha256Hex,
 } from '../_shared/server.ts';
+import {
+  resolveActiveSessionByPasscode,
+  type ActiveSessionRow,
+  type PasscodeSessionQuery,
+} from './resolveSession.ts';
 
 // --- Best-effort in-memory rate limit (see header note) ---
 // 300 per session per minute: a full Nigerian lecture hall scanning
@@ -128,7 +140,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return errorResponse('invalid_body', 'Request body must be valid JSON.', 400);
   }
 
-  const sessionId = typeof body.sessionId === 'string' ? body.sessionId.trim() : '';
+  let sessionId = typeof body.sessionId === 'string' ? body.sessionId.trim() : '';
   const registrationNumber = typeof body.registrationNumber === 'string'
     ? normalizeRegistrationNumber(body.registrationNumber)
     : '';
@@ -143,7 +155,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const deviceFingerprint =
     typeof body.deviceFingerprint === 'string' ? body.deviceFingerprint.trim() : '';
 
-  if (!sessionId) return errorResponse('invalid_request', 'sessionId is required.', 400);
+  if (!sessionId && !passcode) {
+    return errorResponse(
+      'invalid_request',
+      'sessionId is required unless a classroom passcode is supplied.',
+      400,
+    );
+  }
   if (!registrationNumber) {
     return errorResponse('invalid_request', 'registrationNumber is required.', 400);
   }
@@ -175,14 +193,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
     );
   }
 
-  if (isRateLimited(sessionId)) {
-    return errorResponse(
-      'rate_limited',
-      'Too many submissions for this session. Wait a minute and try again.',
-      429,
-    );
-  }
-
   let supabase;
   try {
     supabase = createServiceClient();
@@ -191,15 +201,49 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   // 1. Session must exist and be active.
-  const { data: session, error: sessionError } = await supabase
-    .from('attendance_sessions')
-    .select('id, status, qr_token_hash, qr_token_issued_at, passcode_hash, qr_expires_in_seconds, anchor_latitude, anchor_longitude, location_radius_meters')
-    .eq('id', sessionId)
-    .maybeSingle();
-  if (sessionError) {
-    return errorResponse('server_error', sessionError.message, 500);
+  // Passcode-only (v0.5.4): no session id — resolve exactly one
+  // ACTIVE session from the passcode hash before anything else.
+  // The lookup happens before the per-session rate limit here
+  // because there is no session id to key the limiter on yet; the
+  // limiter still runs on the resolved id below, before any write.
+  let session: ActiveSessionRow | null = null;
+  if (!sessionId) {
+    const passcodeHash = await sha256Hex(passcode);
+    const resolved = await resolveActiveSessionByPasscode(
+      supabase as unknown as PasscodeSessionQuery,
+      passcodeHash,
+    );
+    if (!resolved.ok) {
+      return errorResponse(
+        resolved.code,
+        resolved.message,
+        resolved.code === 'server_error' ? 500 : 401,
+      );
+    }
+    session = resolved.session;
+    sessionId = session.id;
   }
-  if (!session) return errorResponse('session_not_found', 'No such attendance session.', 404);
+
+  if (isRateLimited(sessionId)) {
+    return errorResponse(
+      'rate_limited',
+      'Too many submissions for this session. Wait a minute and try again.',
+      429,
+    );
+  }
+
+  if (!session) {
+    const { data, error: sessionError } = await supabase
+      .from('attendance_sessions')
+      .select('id, status, qr_token_hash, qr_token_issued_at, passcode_hash, qr_expires_in_seconds, anchor_latitude, anchor_longitude, location_radius_meters')
+      .eq('id', sessionId)
+      .maybeSingle();
+    if (sessionError) {
+      return errorResponse('server_error', sessionError.message, 500);
+    }
+    if (!data) return errorResponse('session_not_found', 'No such attendance session.', 404);
+    session = data as ActiveSessionRow;
+  }
   if (session.status !== 'active') {
     return errorResponse(
       'session_not_active',

@@ -186,7 +186,13 @@ export function transitionSession(
 }
 
 export interface SubmitAttendanceInput {
-  sessionId: string;
+  /**
+   * The session, when the student arrived from a QR link. Optional
+   * since v0.5.4: a student who entered the classroom passcode on
+   * the /submit entry page has no session id — the server resolves
+   * the session from the passcode hash instead.
+   */
+  sessionId?: string;
   registrationNumber: string;
   token?: string;
   passcode?: string;
@@ -259,4 +265,23 @@ export function getSubmitParams(search: string): SubmitParams | null {
   const sessionId = params.get('submit');
   if (!sessionId) return null;
   return { sessionId, token: params.get('token') };
+}
+
+export type SubmitRoute =
+  | { kind: 'session'; params: SubmitParams }
+  | { kind: 'entry' };
+
+/**
+ * Which public submission view the current URL is (v0.5.4):
+ * - `session` — a QR link (`?submit=<sessionId>&token=<token>`, on
+ *   any path) or the same params on `/submit`: the attendance form.
+ * - `entry` — `/submit` with no session params: the passcode entry
+ *   page for students who cannot scan the QR code.
+ * - `null` — any other page: the lecturer portal.
+ */
+export function getSubmitRoute(pathname: string, search: string): SubmitRoute | null {
+  const params = getSubmitParams(search);
+  if (params) return { kind: 'session', params };
+  if (pathname === '/submit') return { kind: 'entry' };
+  return null;
 }

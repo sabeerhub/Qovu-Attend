@@ -246,6 +246,38 @@ describe('attendance-submit client', () => {
       expect(result.status).toBe(410);
     }
   });
+
+  it('omits sessionId and sends only the passcode for the /submit entry flow (v0.5.4)', async () => {
+    stubFetch({
+      status: 200,
+      body: {
+        ok: true,
+        duplicate: false,
+        retried: false,
+        record: {
+          id: 'r1',
+          session_id: 's1',
+          registration_number: 'FUT/2022/001',
+          status: 'verified',
+          verification_method: 'passcode',
+          submitted_at: '2026-11-15T10:01:00.000Z',
+        },
+      },
+    });
+    const result = await submitAttendance({
+      registrationNumber: 'FUT/2022/001',
+      passcode: '123456',
+      idempotencyKey: 'attempt-abc',
+      latitude: 11.123456,
+      longitude: 8.123456,
+      accuracy: 12,
+      deviceFingerprint: 'a'.repeat(64),
+    });
+    expect(result.ok).toBe(true);
+    const body = JSON.parse(String(fetchCalls[0].init.body)) as Record<string, unknown>;
+    expect(body).not.toHaveProperty('sessionId');
+    expect(body).toMatchObject({ passcode: '123456' });
+  });
 });
 
 describe('manual-attendance client', () => {
