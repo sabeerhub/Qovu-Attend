@@ -4,9 +4,9 @@ import { LogoSplash } from './components/brand/LogoSplash';
 
 /**
  * Composition root. The logo splash plays first on every full page
- * load (1.3 s, skipped for reduced motion, never blocking), then
- * the app underneath — landing page, sign-in, dashboard, or the
- * public student submission — takes over.
+ * load (about 7 s, tap/click or Escape to skip, skipped for reduced
+ * motion, never blocking), then the app underneath — landing page,
+ * sign-in, dashboard, or the public student submission — takes over.
  */
 export default function App() {
   const [splashDone, setSplashDone] = useState(false);

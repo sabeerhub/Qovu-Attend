@@ -1,5 +1,48 @@
 # Changelog — UniAttend
 
+## v0.8.1 — 2026-11-17 — Longer splash, rebuilt landing page (owner feedback on v0.7.0)
+
+- **Splash now ~7 seconds (Job 1, owner feedback: 1.3 s was too short to
+  read the name).** The Q mark draws in (ring, then tail, then the
+  accent dot), the "Qovu" wordmark fades in and stays on screen for
+  the rest of the animation, and the screen fades away at 7 s —
+  inside the owner's 6-to-10-second rule. A tap or click anywhere
+  skips it at once, the Escape key skips it too, and a small "Tap
+  anywhere to continue" hint appears under the name. `prefers-reduced-motion`
+  still skips it entirely, and the CSS end-state stays
+  `visibility: hidden`, so the splash can never trap the page even
+  if its timer fails. Changed: `src/lib/splash.ts` (duration
+  1300 → 7000 ms, new pure `isSplashSkipKey`), `src/components/brand/LogoSplash.tsx`
+  (click + Escape skip with a once-guard), `src/styles/globals.css`
+  (retimed keyframes), `src/App.tsx` (comment).
+- **Landing page rebuilt, Apple level (Job 2, owner feedback: the
+  v0.7.0 page looked ugly and scattered).** One centred hero — big
+  Qovu mark, "Attendance, verified.", one plain sentence, Create
+  account / Sign in — then one small hand-built flat SVG cartoon
+  (a lecturer holding up the QR, two students scanning it; ink
+  line art with a single accent-blue square, no gradients, no extra
+  colours), a short centred "How it works" in 3 steps, and a single
+  quiet features strip ("30 m location check · One device per
+  student · Headcount cross-check"). The old three-column features
+  section and its filler copy are gone. New:
+  `src/features/landing/LandingIllustration.tsx`; rebuilt:
+  `src/features/landing/LandingPage.tsx`. Logged-in lecturers still
+  skip the landing page straight to the dashboard; `/submit` and
+  `/?submit=...` routing is untouched.
+- **Tests:** 264 passing (was 257), 25 files. New/updated:
+  `tests/unit/splash.test.ts` (7 s inside the 6–10 s rule, Escape
+  is the only skip key, splash renders mark + name + skip hint),
+  `tests/unit/landing.test.ts` (one hero heading, both buttons,
+  three steps, one features strip, one illustration SVG with a
+  single accent-blue square, no gradients).
+- **Not verified live.** The desktop look of the rebuilt landing
+  page was checked by CSS review only — no visual screenshot is
+  possible in this environment. The click/Escape skip behaviour is
+  covered by the pure key helper test plus code review (no DOM
+  event-testing library is installed). My Lecture Plan, the student
+  /submit flow, QR links, sign-up and all attendance/security
+  logic are untouched.
+
 ## v0.8.0 — 2026-11-17 — My Lecture Plan (weekly timetable, one-tap sessions)
 
 - **Why (Phase 1–2).** In Nigerian universities a lecturer teaches

@@ -1,12 +1,15 @@
 import { QovuBrand } from '@/components/brand/QovuBrand';
 import { Button } from '@/components/ui/button';
+import { LandingIllustration } from './LandingIllustration';
 
 /**
- * Public landing page (v0.7.0), shown at `/` to logged-out
- * visitors. Plain words, no decoration: what Qovu does, how it
- * works in three steps, and two buttons — Create account, Sign in.
- * Logged-in lecturers never see this page; they go straight to
- * the dashboard. Students never need an account.
+ * Public landing page (v0.8.1 rebuild), shown at `/` to logged-out
+ * visitors. Apple landing-page level, not scattered: one centred
+ * hero (mark, one headline, one sentence, two buttons), one small
+ * hand-built cartoon underneath it, then a short "How it works"
+ * and a single minimal features strip — nothing else. Logged-in
+ * lecturers never see this page; they go straight to the
+ * dashboard. Students never need an account.
  */
 export function LandingPage({
   onSignIn,
@@ -27,10 +30,11 @@ export function LandingPage({
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-[1120px] flex-1 flex-col px-4 md:px-6">
-        {/* Hero */}
-        <section className="flex flex-col items-start gap-4 py-16 md:py-24">
-          <h1 className="max-w-[640px] text-[32px] font-semibold leading-tight tracking-tight text-ink md:text-[40px]">
+      <main className="mx-auto flex w-full max-w-[1120px] flex-1 flex-col items-center px-4 text-center md:px-6">
+        {/* Hero — one idea, centred */}
+        <section className="flex flex-col items-center gap-5 py-16 md:py-24">
+          <img src="/favicon.svg" alt="" aria-hidden="true" width={64} height={64} />
+          <h1 className="max-w-[640px] text-[40px] font-semibold leading-tight tracking-tight text-ink md:text-[56px]">
             Attendance, verified.
           </h1>
           <p className="max-w-[560px] text-[17px] leading-relaxed text-muted">
@@ -38,20 +42,23 @@ export function LandingPage({
             students mark themselves present, and Qovu checks they are
             really in the room.
           </p>
-          <div className="mt-2 flex flex-wrap gap-2">
+          <div className="mt-2 flex flex-wrap justify-center gap-2">
             <Button onClick={onSignUp}>Create account</Button>
             <Button variant="secondary" onClick={onSignIn}>
               Sign in
             </Button>
           </div>
           <p className="text-[13px] text-faint">For lecturers. Students never need an account.</p>
+          <div className="mt-8 w-full max-w-[560px]">
+            <LandingIllustration />
+          </div>
         </section>
 
-        {/* How it works — three steps */}
-        <section className="border-t border-line py-12">
+        {/* How it works — three steps, nothing else */}
+        <section className="w-full border-t border-line py-16">
           <h2 className="text-[17px] font-semibold text-ink">How it works</h2>
-          <ol className="mt-6 grid gap-6 md:grid-cols-3">
-            <li className="flex flex-col gap-1.5">
+          <ol className="mx-auto mt-8 grid max-w-[880px] gap-8 text-center md:grid-cols-3">
+            <li className="flex flex-col items-center gap-1.5">
               <p className="text-[13px] font-medium text-faint">1</p>
               <p className="text-[15px] font-medium text-ink">The lecturer starts a session</p>
               <p className="text-[13px] leading-relaxed text-muted">
@@ -59,7 +66,7 @@ export function LandingPage({
                 project the QR code or read out the 6-digit code.
               </p>
             </li>
-            <li className="flex flex-col gap-1.5">
+            <li className="flex flex-col items-center gap-1.5">
               <p className="text-[13px] font-medium text-faint">2</p>
               <p className="text-[15px] font-medium text-ink">Students mark themselves present</p>
               <p className="text-[13px] leading-relaxed text-muted">
@@ -67,7 +74,7 @@ export function LandingPage({
                 install — just a registration number.
               </p>
             </li>
-            <li className="flex flex-col gap-1.5">
+            <li className="flex flex-col items-center gap-1.5">
               <p className="text-[13px] font-medium text-faint">3</p>
               <p className="text-[15px] font-medium text-ink">Qovu checks they are really there</p>
               <p className="text-[13px] leading-relaxed text-muted">
@@ -79,33 +86,12 @@ export function LandingPage({
           </ol>
         </section>
 
-        {/* Features — kept minimal */}
-        <section className="border-t border-line py-12">
-          <h2 className="text-[17px] font-semibold text-ink">Built against cheating</h2>
-          <div className="mt-6 grid gap-6 md:grid-cols-3">
-            <div className="flex flex-col gap-1.5">
-              <p className="text-[15px] font-medium text-ink">In the room, not at home</p>
-              <p className="text-[13px] leading-relaxed text-muted">
-                A student outside the lecture hall is turned away — the
-                check is 30 metres from where the lecturer activates the
-                session.
-              </p>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <p className="text-[15px] font-medium text-ink">One device, one student</p>
-              <p className="text-[13px] leading-relaxed text-muted">
-                A phone can only mark one registration number per session,
-                so one student cannot sign in for a friend.
-              </p>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <p className="text-[15px] font-medium text-ink">Headcount cross-check</p>
-              <p className="text-[13px] leading-relaxed text-muted">
-                Submissions are compared with the physical headcount the
-                lecturer takes in the hall.
-              </p>
-            </div>
-          </div>
+        {/* Features — one quiet strip, no boxes, no filler */}
+        <section className="w-full border-t border-line py-10">
+          <p className="text-[13px] leading-relaxed text-muted">
+            30 m location check&nbsp;&nbsp;·&nbsp;&nbsp;One device per student&nbsp;&nbsp;·&nbsp;&nbsp;Headcount
+            cross-check
+          </p>
         </section>
       </main>
 
