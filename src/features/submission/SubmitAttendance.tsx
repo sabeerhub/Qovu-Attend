@@ -11,6 +11,7 @@ import {
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { QovuBrand } from '@/components/brand/QovuBrand';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/empty-state';
 
 /**
@@ -68,7 +69,9 @@ export function SubmitAttendance(props?: { passcode?: string }) {
   if (!isSupabaseConfigured) {
     return (
       <div className="mx-auto w-full max-w-md px-4 py-10">
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">UniAttend</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-ink">
+          <QovuBrand markSize={28} textClassName="text-2xl" />
+        </h1>
         <p className="mt-1 text-[13px] text-muted">Attendance submission</p>
         <div className="mt-6">
           <EmptyState
@@ -83,7 +86,9 @@ export function SubmitAttendance(props?: { passcode?: string }) {
   if (!urlParams && !passcodeOnly) {
     return (
       <div className="mx-auto w-full max-w-md px-4 py-10">
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">UniAttend</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-ink">
+          <QovuBrand markSize={28} textClassName="text-2xl" />
+        </h1>
         <p className="mt-1 text-[13px] text-muted">Attendance submission</p>
         <div className="mt-6">
           <EmptyState
@@ -212,7 +217,9 @@ export function SubmitAttendance(props?: { passcode?: string }) {
 
   return (
     <div className="mx-auto w-full max-w-md px-4 py-10">
-      <h1 className="text-2xl font-semibold tracking-tight text-ink">UniAttend</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-ink">
+        <QovuBrand markSize={28} textClassName="text-2xl" />
+      </h1>
       <p className="mt-1 text-[13px] text-muted">Attendance submission</p>
 
       {state.status === 'submitting' ? (

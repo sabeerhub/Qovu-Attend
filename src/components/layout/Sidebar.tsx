@@ -9,6 +9,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { QovuBrand } from '@/components/brand/QovuBrand';
 import { isMoreNavKey, MORE_SHEET_ITEMS, TAB_BAR_ITEMS, type TabBarKey } from '@/lib/navigation';
 import type { NavKey } from '@/app/routes';
 
@@ -39,7 +40,9 @@ export function Sidebar({
 }) {
   return (
     <aside className="hidden w-60 shrink-0 flex-col bg-canvas px-3 py-6 md:flex">
-      <p className="px-3 pb-6 text-[17px] font-semibold tracking-tight text-ink">UniAttend</p>
+      <p className="px-3 pb-6">
+        <QovuBrand markSize={22} textClassName="text-[17px]" />
+      </p>
       <nav aria-label="Lecturer portal" className="flex flex-col gap-0.5">
         {NAV_ITEMS.map((item) => (
           <button

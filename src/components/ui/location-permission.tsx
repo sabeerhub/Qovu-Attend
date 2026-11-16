@@ -16,7 +16,7 @@ export function LocationBlockedPanel({ onRetry }: { onRetry: () => void }) {
     <div className="rounded-xl border border-line bg-surface p-4 shadow-card" role="alert">
       <p className="text-[15px] font-medium text-ink">Location is blocked for this site</p>
       <p className="mt-1 text-[13px] text-muted">
-        Your browser is not sharing location with UniAttend, so this step cannot continue.
+        Your browser is not sharing location with Qovu, so this step cannot continue.
         The app cannot turn location back on by itself — allow it for this site, then try
         again.
       </p>
@@ -49,7 +49,7 @@ export function LocationAllowPanel({
     <div className="rounded-xl border border-line bg-surface p-4 shadow-card">
       <p className="text-[15px] font-medium text-ink">Allow location to continue</p>
       <p className="mt-1 text-[13px] text-muted">
-        UniAttend needs your location for this step. Tap the button and allow location when
+        Qovu needs your location for this step. Tap the button and allow location when
         your browser asks.
       </p>
       <Button className="mt-3" disabled={locating} onClick={onAllow}>

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Qovu">
+  <style>
+    .q-ink { stroke: #111111; }
+    @media (prefers-color-scheme: dark) {
+      .q-ink { stroke: #ffffff; }
+    }
+  </style>
+  <!-- Qovu mark: a plain Q — one circle, one short tail — with a
+       single accent-blue dot at its centre: present, here, checked in.
+       No gradients, no shadows. The ring and tail stay readable at 16px. -->
+  <circle class="q-ink" cx="30" cy="28" r="19" fill="none" stroke-width="6"/>
+  <line class="q-ink" x1="43" y1="41" x2="53" y2="53" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="30" cy="28" r="5.5" fill="#0071e3"/>
+</svg>

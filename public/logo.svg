@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 64" role="img" aria-label="Qovu">
+  <style>
+    .q-ink { stroke: #111111; }
+    .q-text { fill: #111111; }
+    @media (prefers-color-scheme: dark) {
+      .q-ink { stroke: #ffffff; }
+      .q-text { fill: #ffffff; }
+    }
+  </style>
+  <!-- Qovu lockup: the Q mark, then the wordmark in the system font.
+       No gradients, no shadows. -->
+  <circle class="q-ink" cx="30" cy="28" r="19" fill="none" stroke-width="6"/>
+  <line class="q-ink" x1="43" y1="41" x2="53" y2="53" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="30" cy="28" r="5.5" fill="#0071e3"/>
+  <text class="q-text" x="72" y="41" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="30" font-weight="600" letter-spacing="-0.5">Qovu</text>
+</svg>

@@ -1,4 +1,4 @@
-# UniAttend — Lecturer Portal
+# Qovu — Lecturer Portal
 
 University Attendance Management System. Lecturer Portal, Phase 1
 foundation scaffold.

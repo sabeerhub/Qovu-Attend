@@ -6,6 +6,7 @@ import { mapPasscodeValidation } from '@/lib/submission';
 import { SubmitAttendance } from './SubmitAttendance';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { QovuBrand } from '@/components/brand/QovuBrand';
 import { EmptyState } from '@/components/ui/empty-state';
 
 /**
@@ -32,7 +33,9 @@ export function SubmitEntry() {
   if (!isSupabaseConfigured) {
     return (
       <div className="mx-auto w-full max-w-md px-4 py-10">
-        <h1 className="text-2xl font-semibold tracking-tight text-ink">UniAttend</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-ink">
+          <QovuBrand markSize={28} textClassName="text-2xl" />
+        </h1>
         <p className="mt-1 text-[13px] text-muted">Attendance submission</p>
         <div className="mt-6">
           <EmptyState
@@ -88,7 +91,9 @@ export function SubmitEntry() {
 
   return (
     <div className="mx-auto w-full max-w-md px-4 py-10">
-      <h1 className="text-2xl font-semibold tracking-tight text-ink">UniAttend</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-ink">
+        <QovuBrand markSize={28} textClassName="text-2xl" />
+      </h1>
       <p className="mt-1 text-[13px] text-muted">Attendance submission</p>
 
       <form onSubmit={onContinue} className="mt-6 flex flex-col gap-4">

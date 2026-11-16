@@ -15,6 +15,7 @@ import { HistoryList } from '@/features/history/HistoryList';
 import { ReportsPanel } from '@/features/reports/ReportsPanel';
 import { ProfileScreen } from '@/features/profile/ProfileScreen';
 import { Button } from '@/components/ui/button';
+import { QovuBrand } from '@/components/brand/QovuBrand';
 import { EmptyState, LoadingState } from '@/components/ui/empty-state';
 
 export function AppShell() {
@@ -57,7 +58,9 @@ export function AppShell() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-surface px-4">
         <div className="text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-ink">UniAttend</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-ink">
+            <QovuBrand markSize={28} textClassName="text-2xl" />
+          </h1>
           <p className="mt-1 text-[13px] text-muted">Lecturer Portal</p>
         </div>
         <EmptyState
@@ -72,7 +75,9 @@ export function AppShell() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-surface px-4">
         <div className="text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-ink">UniAttend</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-ink">
+            <QovuBrand markSize={28} textClassName="text-2xl" />
+          </h1>
           <p className="mt-1 text-[13px] text-muted">Lecturer Portal</p>
         </div>
         <SignInForm />

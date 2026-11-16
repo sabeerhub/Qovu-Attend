@@ -1,5 +1,49 @@
 # Changelog — UniAttend
 
+## v0.6.0 — 2026-11-17 — The product is now Qovu: hand-built logo, favicon, in-app brand
+
+- **New name: Qovu (product-owner decision 2026-11-17).** The attendance
+  product's global name is Qovu — 4 letters, invented, checked free of
+  any company using it (the only hit is a Fijian surname). The repo
+  (`sabeerhub/UniAttend`), the Vercel project (`uniattend-x`) and the
+  Supabase project are NOT renamed — those are owner actions. The live
+  URL is unchanged.
+- **Logo, hand-built, not AI slop.** The mark is a plain Q drawn by hand
+  in SVG: one circle, one short tail, and a single accent-blue dot at
+  its centre — present, here, checked in. Ink `#111111`, one accent
+  `#0071e3` used exactly once (the dot), no gradients, no shadows, no
+  clip-art, no generic checkmark-in-a-circle. The ring and tail stay
+  readable at 16 px favicon size. The wordmark is just "Qovu" in the
+  system font, ink, next to the mark.
+- **Files.** `public/favicon.svg` (mark only; the ink strokes switch to
+  white under `prefers-color-scheme: dark`), `public/logo.svg` (mark +
+  "Qovu" horizontal lockup), `public/apple-touch-icon.png` (180×180,
+  rendered from the same mark geometry — no converter was available on
+  the build machine, so it was rasterised with a small stdlib-only
+  Python script and its pixels verified: white corners, accent-blue
+  centre dot, ink ring and tail). `index.html` links the favicon and
+  the touch icon and titles the page "Qovu — Attendance, verified".
+- **In-app brand.** New shared `src/components/brand/QovuBrand.tsx`
+  (mark from `/favicon.svg` — one source of truth for the geometry —
+  plus the "Qovu" wordmark) replaces the "UniAttend" text brand in the
+  lecturer sign-in / not-configured screens (`AppShell.tsx`), the
+  desktop sidebar (`Sidebar.tsx`), and the student submission pages
+  (`SubmitAttendance.tsx`, `SubmitEntry.tsx`); the location-permission
+  copy now says Qovu. Layout, spacing and colours are unchanged.
+- **Deliberately untouched.** Docs and the spec still say UniAttend
+  (no doc rewrites in this slice); the canvas text in
+  `src/lib/deviceFingerprint.ts` still reads "UniAttend device check"
+  — it feeds the device hash, so changing it would change every
+  device's fingerprint; the package/repo names are unchanged.
+- Client: `public/favicon.svg`, `public/logo.svg`,
+  `public/apple-touch-icon.png`, `src/components/brand/QovuBrand.tsx`
+  (new), `index.html`, `src/app/AppShell.tsx`,
+  `src/components/layout/Sidebar.tsx`,
+  `src/features/submission/SubmitAttendance.tsx`,
+  `src/features/submission/SubmitEntry.tsx`,
+  `src/components/ui/location-permission.tsx`. No migration, no Edge
+  Function change.
+
 ## v0.5.5 — 2026-11-16 — The /submit page now checks the code straight away
 
 - **Code checked the moment the student taps Continue (v0.5.5, product-owner
