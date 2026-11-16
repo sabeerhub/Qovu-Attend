@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_LOCATION_RADIUS_METERS,
   checkLocation,
   haversineMeters,
   locationErrorMessage,
+  nextLocationStep,
+  queryLocationPermission,
   requestDeviceLocation,
   type GeoCoords,
 } from '@/lib/geo';
@@ -101,9 +103,110 @@ describe('checkLocation (server rule mirror)', () => {
 });
 
 describe('requestDeviceLocation', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('reports unsupported with no Geolocation API (Node test env)', async () => {
     const result = await requestDeviceLocation();
     expect(result).toEqual({ ok: false, coords: null, error: 'unsupported' });
+  });
+
+  it('succeeds on the first high-accuracy attempt (30 s, no cache)', async () => {
+    const { calls } = mockGeolocation([
+      { kind: 'success', latitude: 11.7594, longitude: 9.3392, accuracy: 12 },
+    ]);
+    const result = await requestDeviceLocation();
+    expect(result).toEqual({
+      ok: true,
+      coords: { latitude: 11.7594, longitude: 9.3392, accuracy: 12 },
+      error: null,
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toEqual({ enableHighAccuracy: true, timeout: 30_000, maximumAge: 0 });
+  });
+
+  it('falls back to a network fix when the high-accuracy attempt times out', async () => {
+    const { calls } = mockGeolocation([
+      { kind: 'error', code: 3 },
+      { kind: 'success', latitude: 11.7594, longitude: 9.3392, accuracy: 45 },
+    ]);
+    const result = await requestDeviceLocation();
+    expect(result).toEqual({
+      ok: true,
+      coords: { latitude: 11.7594, longitude: 9.3392, accuracy: 45 },
+      error: null,
+    });
+    expect(calls).toHaveLength(2);
+    expect(calls[1]).toEqual({ enableHighAccuracy: false, timeout: 15_000, maximumAge: 30_000 });
+  });
+
+  it('falls back to a network fix when the high-accuracy attempt is unavailable', async () => {
+    const { calls } = mockGeolocation([
+      { kind: 'error', code: 2 },
+      { kind: 'success', latitude: 11.7594, longitude: 9.3392, accuracy: 60 },
+    ]);
+    const result = await requestDeviceLocation();
+    expect(result.ok).toBe(true);
+    expect(result.coords?.accuracy).toBe(60);
+    expect(calls).toHaveLength(2);
+  });
+
+  it('fails fast on a denial — no retry after the browser says no', async () => {
+    const { calls, getCurrentPosition } = mockGeolocation([{ kind: 'error', code: 1 }]);
+    const result = await requestDeviceLocation();
+    expect(result).toEqual({ ok: false, coords: null, error: 'denied' });
+    expect(getCurrentPosition).toHaveBeenCalledTimes(1);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('returns the second attempt’s error when both stages fail', async () => {
+    const { calls } = mockGeolocation([
+      { kind: 'error', code: 3 },
+      { kind: 'error', code: 2 },
+    ]);
+    const result = await requestDeviceLocation();
+    expect(result).toEqual({ ok: false, coords: null, error: 'unavailable' });
+    expect(calls).toHaveLength(2);
+  });
+});
+
+describe('queryLocationPermission', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('returns the browser’s reported state', async () => {
+    for (const state of ['denied', 'prompt', 'granted'] as const) {
+      mockPermissions(state);
+      await expect(queryLocationPermission()).resolves.toBe(state);
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('returns unknown with no Permissions API', async () => {
+    vi.stubGlobal('navigator', {});
+    await expect(queryLocationPermission()).resolves.toBe('unknown');
+  });
+
+  it('returns unknown when the query throws', async () => {
+    mockPermissions('granted', true);
+    await expect(queryLocationPermission()).resolves.toBe('unknown');
+  });
+});
+
+describe('nextLocationStep (permission branching)', () => {
+  it('blocks on denied — the browser will not re-prompt', () => {
+    expect(nextLocationStep('denied')).toBe('blocked');
+  });
+
+  it('asks for an explicit tap on prompt or granted', () => {
+    expect(nextLocationStep('prompt')).toBe('ask');
+    expect(nextLocationStep('granted')).toBe('ask');
+  });
+
+  it('goes straight to the capture with no Permissions API', () => {
+    expect(nextLocationStep('unknown')).toBe('request');
   });
 });
 
@@ -113,3 +216,58 @@ describe('locationErrorMessage', () => {
     expect(locationErrorMessage('denied')).toMatch(/location/i);
   });
 });
+
+// --- mocks for the geolocation / permissions tests above ---
+
+type GeoBehavior =
+  | { kind: 'success'; latitude: number; longitude: number; accuracy: number }
+  | { kind: 'error'; code: number };
+
+function mockGeolocation(behaviors: GeoBehavior[]) {
+  const calls: PositionOptions[] = [];
+  const getCurrentPosition = vi.fn(
+    (
+      success: PositionCallback,
+      error: PositionErrorCallback | null | undefined,
+      options?: PositionOptions,
+    ) => {
+      calls.push(options ?? {});
+      const behavior = behaviors.shift();
+      if (!behavior || behavior.kind === 'error') {
+        const code = behavior && behavior.kind === 'error' ? behavior.code : 3;
+        (error as PositionErrorCallback)({
+          code,
+          message: 'mock geolocation error',
+          PERMISSION_DENIED: 1,
+          POSITION_UNAVAILABLE: 2,
+          TIMEOUT: 3,
+        } as GeolocationPositionError);
+        return;
+      }
+      success({
+        coords: {
+          latitude: behavior.latitude,
+          longitude: behavior.longitude,
+          accuracy: behavior.accuracy,
+          altitude: null,
+          altitudeAccuracy: null,
+          heading: null,
+          speed: null,
+        },
+        timestamp: Date.now(),
+      } as GeolocationPosition);
+    },
+  );
+  vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
+  return { calls, getCurrentPosition };
+}
+
+function mockPermissions(state: 'denied' | 'prompt' | 'granted', rejects = false) {
+  const query = rejects
+    ? vi.fn(async () => {
+        throw new Error('permissions unavailable');
+      })
+    : vi.fn(async () => ({ state }));
+  vi.stubGlobal('navigator', { permissions: { query } });
+  return query;
+}

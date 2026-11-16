@@ -1,5 +1,41 @@
 # Changelog — UniAttend
 
+## v0.5.1 — 2026-11-16 — Location capture that works indoors: longer fix + explicit permission step
+
+- **Location capture fixed (v0.5.1, product-owner report: activation failed with the
+  location-required error even with location services on).** The old capture was one
+  high-accuracy attempt with a 10 s timeout — a GPS fix indoors routinely takes longer
+  than 10 s or fails, so activation was refused even when location was on. Capture is
+  now two-stage: high accuracy for 30 s, then, only on a timeout or an unavailable
+  position, a network-based fix for 15 s (cached fixes up to 30 s old accepted). A
+  denied permission still fails fast with no retry. The 30 m radius and the 100 m
+  accuracy cap are unchanged, and the mandatory-location rules are unchanged: no
+  location, no activation and no submission.
+- **Explicit permission step.** Before capturing, the app checks the permission state
+  with `navigator.permissions` where the browser has it. If location is denied for
+  this site, the app does not call `getCurrentPosition` again — a denied permission
+  never re-prompts — and instead shows a blocked panel with plain re-allow steps for
+  Chrome (address-bar tune/lock icon → Site settings → Location → Allow) and Safari
+  (aA icon → Website Settings → Location → Allow), plus a "Try again" button that
+  re-checks the permission. If the state is 'prompt' or 'granted', an "Allow location
+  to continue" button triggers the capture from an explicit tap so the browser shows
+  its prompt reliably. Without a Permissions API the app goes straight to the capture.
+  A website cannot force the browser to re-show the prompt after a denial and cannot
+  switch on OS location services — the in-app panel + instructions is the correct
+  mechanism.
+- **Visible locating state.** Activation (monitor and session list) and student
+  submission now show "Finding your location…" while the capture runs, instead of
+  silence followed by an error.
+- Client: `src/lib/geo.ts` (two-stage `requestDeviceLocation`, `queryLocationPermission`,
+  `nextLocationStep`); new `src/components/ui/location-permission.tsx`
+  (`LocationBlockedPanel`, `LocationAllowPanel`); `SessionMonitor` / `SessionList` /
+  `SubmitAttendance` route location through the permission gate. No Edge Function
+  changes, no migration, no schema change.
+- Tests: `tests/unit/geo.test.ts` — stage-1 success, timeout/unavailable falling back
+  to the network fix, denial failing fast with no retry, both stages failing, and
+  permission-state branching (denied → blocked, prompt/granted → ask, no Permissions
+  API → straight to capture).
+
 ## v0.5.0 — 2026-11-16 — Smart verification: lecturer-anchored location, device binding, headcount confirm
 
 - **Lecturer-anchored location (Phase 4 slice 1, product-owner decisions 2026-11-16).**

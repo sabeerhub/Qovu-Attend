@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { buildIdempotencyKey, isValidRegistrationNumber, normalizeRegistrationNumber } from '@/lib/submission';
 import { getSubmitParams, submitAttendance } from '@/lib/edgeFunctions';
-import { locationErrorMessage, requestDeviceLocation } from '@/lib/geo';
+import { locationErrorMessage, nextLocationStep, queryLocationPermission, requestDeviceLocation } from '@/lib/geo';
+import { LocationAllowPanel, LocationBlockedPanel } from '@/components/ui/location-permission';
 import {
   getDeviceFingerprint,
   readSubmittedFlag,
@@ -44,6 +45,12 @@ export function SubmitAttendance() {
   >({ status: 'form' });
   const [formError, setFormError] = useState<string | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
+  // Location permission gate (v0.5.1): the browser is asked to
+  // share location from an explicit tap, and a denial shows
+  // re-allow steps instead of calling getCurrentPosition again.
+  const [locationGate, setLocationGate] = useState<null | {
+    permission: 'granted' | 'prompt' | 'denied' | 'unknown';
+  }>(null);
   // Per-browser hint only (localStorage): this browser already
   // submitted for a registration number in this session. The server
   // enforces device binding; this is just a heads-up, never a block.
@@ -93,7 +100,46 @@ export function SubmitAttendance() {
       return;
     }
     if (!params) return;
+    await startLocationFlow();
+  }
+
+  async function startLocationFlow() {
+    // Explicit permission step (v0.5.1): check the permission state
+    // first. A denial never re-prompts, so it shows re-allow steps;
+    // prompt/granted need an explicit tap so the browser shows its
+    // prompt reliably; without a Permissions API, go straight to
+    // the capture.
+    const permission = await queryLocationPermission();
+    const step = nextLocationStep(permission);
+    if (step === 'blocked') {
+      setLocationGate({ permission });
+      return;
+    }
+    if (step === 'request') {
+      await submitWithLocation();
+      return;
+    }
+    setLocationGate({ permission });
+  }
+
+  async function submitWithLocation() {
+    if (!params) return;
+    // Re-check the inputs: the Allow tap happens after validation,
+    // but the values may have changed since.
+    if (!isValidRegistrationNumber(registrationNumber)) {
+      setLocationGate(null);
+      setFormError('Enter your registration number.');
+      return;
+    }
+    const token = params.token ?? null;
+    const trimmedPasscode = passcode.trim();
+    if (!token && trimmedPasscode.length === 0) {
+      setLocationGate(null);
+      setFormError('Enter the classroom passcode shown by your lecturer.');
+      return;
+    }
     const normalized = normalizeRegistrationNumber(registrationNumber);
+    setLocationGate(null);
     setState({ status: 'submitting' });
     // Location is mandatory: no coordinates, no attendance. The
     // student must allow location for this site.
@@ -212,6 +258,18 @@ export function SubmitAttendance() {
               This browser already submitted attendance for {browserFlag} in this session.
             </p>
           ) : null}
+          {locationGate ? (
+            locationGate.permission === 'denied' ? (
+              <LocationBlockedPanel
+                onRetry={() => {
+                  setLocationGate(null);
+                  void startLocationFlow();
+                }}
+              />
+            ) : (
+              <LocationAllowPanel locating={false} onAllow={() => void submitWithLocation()} />
+            )
+          ) : null}
           <label className="flex flex-col gap-1.5 text-[13px] font-medium text-ink">
             Registration number
             <Input
@@ -241,7 +299,7 @@ export function SubmitAttendance() {
               {formError}
             </p>
           ) : null}
-          <Button type="submit" className="self-start">
+          <Button type="submit" disabled={locationGate !== null} className="self-start">
             Submit attendance
           </Button>
         </form>

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { transitionSession } from '@/lib/edgeFunctions';
-import { locationErrorMessage, requestDeviceLocation } from '@/lib/geo';
+import { locationErrorMessage, nextLocationStep, queryLocationPermission, requestDeviceLocation, type LocationPermissionState } from '@/lib/geo';
+import { LocationAllowPanel, LocationBlockedPanel } from '@/components/ui/location-permission';
 import type { AttendanceSession } from '@/types/database';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,14 @@ export function SessionList({
   >({ status: 'loading' });
   const [activatingId, setActivatingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  // Location permission gate (v0.5.1): activation first asks the
+  // browser to share location, from an explicit tap, and shows a
+  // visible "Finding your location…" state while the capture runs.
+  const [locationGate, setLocationGate] = useState<null | {
+    session: SessionRow;
+    permission: LocationPermissionState;
+  }>(null);
+  const [locating, setLocating] = useState(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -59,9 +68,28 @@ export function SessionList({
 
   async function onActivate(session: SessionRow) {
     setActionError(null);
-    // Activation (Phase 4) needs the lecturer's location anchor.
-    // Without it the session does not start.
+    // Explicit permission step (v0.5.1): check the permission state
+    // first. A denial never re-prompts, so it shows re-allow steps
+    // instead of calling getCurrentPosition; prompt/granted need an
+    // explicit tap so the browser shows its prompt reliably.
+    const permission = await queryLocationPermission();
+    const step = nextLocationStep(permission);
+    if (step === 'blocked') {
+      setLocationGate({ session, permission });
+      return;
+    }
+    setLocationGate({ session, permission });
+    if (step === 'request') {
+      // No Permissions API: go straight to the capture, visibly.
+      await locateAndActivate(session);
+    }
+  }
+
+  async function locateAndActivate(session: SessionRow) {
+    setLocating(true);
     const location = await requestDeviceLocation();
+    setLocating(false);
+    setLocationGate(null);
     if (!location.ok || !location.coords) {
       setActionError(
         `Your location is required to start a session. ${locationErrorMessage(location.error ?? 'unavailable')}`,
@@ -97,6 +125,23 @@ export function SessionList({
           {actionError}
         </p>
       ) : null}
+      {locationGate ? (
+        <div className="mb-4">
+          {locationGate.permission === 'denied' ? (
+            <LocationBlockedPanel
+              onRetry={() => {
+                setLocationGate(null);
+                void onActivate(locationGate.session);
+              }}
+            />
+          ) : (
+            <LocationAllowPanel
+              locating={locating}
+              onAllow={() => void locateAndActivate(locationGate.session)}
+            />
+          )}
+        </div>
+      ) : null}
       <table className="w-full text-left text-sm">
         <thead>
           <tr className="border-b border-line text-[12px] uppercase text-muted">
@@ -123,7 +168,7 @@ export function SessionList({
                   {session.status === 'draft' ? (
                     <Button
                       variant="secondary"
-                      disabled={activatingId !== null}
+                      disabled={activatingId !== null || locationGate !== null}
                       onClick={() => void onActivate(session)}
                     >
                       {activatingId === session.id ? 'Activating…' : 'Activate'}

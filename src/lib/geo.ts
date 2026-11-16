@@ -29,6 +29,46 @@ export interface GeoCoords {
 
 export type LocationErrorCode = 'unsupported' | 'denied' | 'unavailable' | 'timeout';
 
+/** Permission state for the Geolocation API, from `navigator.permissions`. */
+export type LocationPermissionState = 'granted' | 'prompt' | 'denied' | 'unknown';
+
+/** What the app should do next, given the permission state. Pure. */
+export type LocationNextStep = 'blocked' | 'ask' | 'request';
+
+/**
+ * Branching for the permission flow, pure and tested. 'denied' means
+ * the browser will not re-show its prompt, so the app must show
+ * re-allow steps instead of calling getCurrentPosition again.
+ * 'unknown' means the browser has no Permissions API — go straight
+ * to the capture. 'prompt'/'granted' need an explicit user tap so
+ * the browser shows its prompt reliably.
+ */
+export function nextLocationStep(permission: LocationPermissionState): LocationNextStep {
+  if (permission === 'denied') return 'blocked';
+  if (permission === 'unknown') return 'request';
+  return 'ask';
+}
+
+/**
+ * Current geolocation permission state. Returns 'unknown' when the
+ * browser has no Permissions API or the query fails — the caller
+ * then goes straight to the capture. Nothing here runs at import
+ * time; `navigator.permissions` is read only when called.
+ */
+export async function queryLocationPermission(): Promise<LocationPermissionState> {
+  const nav = globalThis.navigator as Navigator | undefined;
+  const permissions = nav?.permissions;
+  if (!permissions || typeof permissions.query !== 'function') return 'unknown';
+  try {
+    const status = await permissions.query({ name: 'geolocation' });
+    const state = status.state;
+    if (state === 'granted' || state === 'prompt' || state === 'denied') return state;
+    return 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
 export interface LocationResult {
   ok: boolean;
   coords: GeoCoords | null;
@@ -76,12 +116,34 @@ export function checkLocation(
 }
 
 /**
- * One-shot device location via the Geolocation API. Nothing here
- * runs at import time: `navigator.geolocation` is read only when
- * this is called, so server-side rendering and tests stay safe.
- * The caller decides the timeout; 10 s is the default.
+ * Two-stage device location via the Geolocation API (v0.5.1).
+ *
+ * A high-accuracy GPS fix indoors routinely takes longer than a few
+ * seconds or fails outright, so a single short high-accuracy attempt
+ * refused activations even with location services on. Stage 1 tries
+ * high accuracy for 30 s; only a timeout or an unavailable position
+ * falls through to stage 2, a network-based fix for 15 s (cached
+ * fixes up to 30 s old are accepted). A denied permission fails fast
+ * — the browser will not re-prompt — and 'unsupported' is final too.
+ * The first usable fix is returned.
+ *
+ * Nothing here runs at import time: `navigator.geolocation` is read
+ * only when this is called, so server-side rendering and tests stay
+ * safe. The anchor accepts any accuracy (it is stored and shown);
+ * the 100 m cap stays a student-submission rule only.
  */
-export function requestDeviceLocation(timeoutMs = 10_000): Promise<LocationResult> {
+const STAGE_ONE_OPTIONS: PositionOptions = {
+  enableHighAccuracy: true,
+  timeout: 30_000,
+  maximumAge: 0,
+};
+const STAGE_TWO_OPTIONS: PositionOptions = {
+  enableHighAccuracy: false,
+  timeout: 15_000,
+  maximumAge: 30_000,
+};
+
+function requestOnce(options: PositionOptions): Promise<LocationResult> {
   const nav = globalThis.navigator as Navigator | undefined;
   if (!nav || !nav.geolocation) {
     return Promise.resolve({ ok: false, coords: null, error: 'unsupported' });
@@ -113,9 +175,19 @@ export function requestDeviceLocation(timeoutMs = 10_000): Promise<LocationResul
                 : 'unavailable';
         resolve({ ok: false, coords: null, error: code });
       },
-      { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 0 },
+      options,
     );
   });
+}
+
+export async function requestDeviceLocation(): Promise<LocationResult> {
+  const first = await requestOnce(STAGE_ONE_OPTIONS);
+  if (first.ok) return first;
+  // A denial is final, and 'unsupported' is final too — retrying
+  // would only waste the user's time.
+  if (first.error === 'denied' || first.error === 'unsupported') return first;
+  // Timeout or unavailable: a network-based fix may still work.
+  return requestOnce(STAGE_TWO_OPTIONS);
 }
 
 /** Plain-language message for a failed location request. */

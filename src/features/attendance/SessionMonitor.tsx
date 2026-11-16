@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { supabase } from '@/lib/supabase';
 import { canTransitionSession, isFinalized } from '@/lib/attendance';
-import { locationErrorMessage, requestDeviceLocation, type GeoCoords } from '@/lib/geo';
+import { locationErrorMessage, nextLocationStep, queryLocationPermission, requestDeviceLocation, type GeoCoords, type LocationPermissionState } from '@/lib/geo';
 import {
   canEditSessionRecords,
   headcountDifference,
@@ -12,6 +12,7 @@ import {
 } from '@/lib/submission';
 import { correctRecord, manualAdd, transitionSession } from '@/lib/edgeFunctions';
 import { QrDisplay } from './QrDisplay';
+import { LocationAllowPanel, LocationBlockedPanel } from '@/components/ui/location-permission';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -88,6 +89,14 @@ export function SessionMonitor({
   >({ status: 'loading' });
   const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
   const [acting, setActing] = useState<SessionStatus | null>(null);
+  // Location permission gate (v0.5.1): activation first asks the
+  // browser to share location, from an explicit tap, and shows a
+  // visible "Finding your location…" state while the capture runs.
+  const [locationGate, setLocationGate] = useState<null | {
+    to: SessionStatus;
+    permission: LocationPermissionState;
+  }>(null);
+  const [locating, setLocating] = useState(false);
 
   const [manualRegNo, setManualRegNo] = useState('');
   const [manualReason, setManualReason] = useState('');
@@ -136,28 +145,56 @@ export function SessionMonitor({
 
   async function runTransition(to: SessionStatus) {
     setNotice(null);
+    if (to !== 'active') {
+      await completeTransition(to, undefined, undefined);
+      return;
+    }
     // Activation (Phase 4): the lecturer's location is the anchor,
     // and the headcount is confirmed from the count just taken in
     // the hall. Without a location the session does not start.
-    let anchor: GeoCoords | undefined;
-    let confirmedHeadcount: number | undefined;
-    if (to === 'active') {
-      const parsed = parseHeadcountInput(headcountInput);
-      if (!parsed.ok) {
-        setNotice({ kind: 'error', text: parsed.error });
-        return;
-      }
-      confirmedHeadcount = parsed.value ?? undefined;
-      const location = await requestDeviceLocation();
-      if (!location.ok || !location.coords) {
-        setNotice({
-          kind: 'error',
-          text: `Your location is required to start a session. ${locationErrorMessage(location.error ?? 'unavailable')}`,
-        });
-        return;
-      }
-      anchor = location.coords;
+    const parsed = parseHeadcountInput(headcountInput);
+    if (!parsed.ok) {
+      setNotice({ kind: 'error', text: parsed.error });
+      return;
     }
+    const confirmedHeadcount = parsed.value ?? undefined;
+    // Explicit permission step (v0.5.1): check the permission state
+    // first. A denial never re-prompts, so it shows re-allow steps
+    // instead of calling getCurrentPosition; prompt/granted need an
+    // explicit tap so the browser shows its prompt reliably.
+    const permission = await queryLocationPermission();
+    const step = nextLocationStep(permission);
+    if (step === 'blocked') {
+      setLocationGate({ to, permission });
+      return;
+    }
+    setLocationGate({ to, permission });
+    if (step === 'request') {
+      // No Permissions API: go straight to the capture, visibly.
+      await locateAndActivate(to, confirmedHeadcount);
+    }
+  }
+
+  async function locateAndActivate(to: SessionStatus, confirmedHeadcount: number | undefined) {
+    setLocating(true);
+    const location = await requestDeviceLocation();
+    setLocating(false);
+    setLocationGate(null);
+    if (!location.ok || !location.coords) {
+      setNotice({
+        kind: 'error',
+        text: `Your location is required to start a session. ${locationErrorMessage(location.error ?? 'unavailable')}`,
+      });
+      return;
+    }
+    await completeTransition(to, location.coords, confirmedHeadcount);
+  }
+
+  async function completeTransition(
+    to: SessionStatus,
+    anchor: GeoCoords | undefined,
+    confirmedHeadcount: number | undefined,
+  ) {
     setActing(to);
     const result = await transitionSession(session.id, to, { anchor, headcount: confirmedHeadcount });
     setActing(null);
@@ -528,6 +565,29 @@ export function SessionMonitor({
                 </span>
               </label>
             ) : null}
+            {locationGate ? (
+              locationGate.permission === 'denied' ? (
+                <LocationBlockedPanel
+                  onRetry={() => {
+                    setLocationGate(null);
+                    void runTransition(locationGate.to);
+                  }}
+                />
+              ) : (
+                <LocationAllowPanel
+                  locating={locating}
+                  onAllow={() => {
+                    const parsed = parseHeadcountInput(headcountInput);
+                    if (!parsed.ok) {
+                      setLocationGate(null);
+                      setNotice({ kind: 'error', text: parsed.error });
+                      return;
+                    }
+                    void locateAndActivate(locationGate.to, parsed.value ?? undefined);
+                  }}
+                />
+              )
+            ) : null}
             <div className="flex flex-wrap gap-3">
               {LIFECYCLE_ACTIONS.filter((a) => canTransitionSession(session.status, a.to)).map(
                 (action) => {
@@ -540,7 +600,7 @@ export function SessionMonitor({
                     <Button
                       key={action.to}
                       variant={action.variant}
-                      disabled={acting !== null}
+                      disabled={acting !== null || locationGate !== null}
                       onClick={() => void runTransition(action.to)}
                     >
                       {acting === action.to ? 'Working…' : label}
@@ -556,7 +616,7 @@ export function SessionMonitor({
         )}
         {session.status === 'finalized' && canTransitionSession(session.status, 'archived') ? (
           <div className="mt-3 flex flex-wrap gap-3">
-            <Button variant="danger" disabled={acting !== null} onClick={() => void runTransition('archived')}>
+            <Button variant="danger" disabled={acting !== null || locationGate !== null} onClick={() => void runTransition('archived')}>
               {acting === 'archived' ? 'Working…' : 'Archive'}
             </Button>
           </div>
