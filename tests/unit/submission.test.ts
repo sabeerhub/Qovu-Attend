@@ -5,6 +5,7 @@ import {
   isDuplicateRegistration,
   isValidRegistrationNumber,
   normalizeRegistrationNumber,
+  parseHeadcountInput,
   summarizeRecords,
   validateCorrection,
   validateManualAttendance,
@@ -21,6 +22,7 @@ function record(reg: string, status: AttendanceRecord['status'] = 'verified'): A
     verification_method: 'qr',
     manual_reason: null,
     idempotency_key: null,
+    device_fingerprint_hash: null,
     submitted_at: '2026-11-15T10:00:00.000Z',
   };
 }
@@ -130,5 +132,23 @@ describe('correction validation', () => {
       validateCorrection({ newStatus: 'bogus' as AttendanceRecord['status'], reason: 'mistake' }),
     ).toMatch(/valid attendance status/i);
     expect(validateCorrection({ newStatus: 'rejected', reason: 'Wrong student' })).toBeNull();
+  });
+});
+
+describe('headcount confirm at activation', () => {
+  it('blank keeps the stored headcount', () => {
+    expect(parseHeadcountInput('')).toEqual({ ok: true, value: null });
+    expect(parseHeadcountInput('   ')).toEqual({ ok: true, value: null });
+  });
+
+  it('accepts whole numbers, including zero', () => {
+    expect(parseHeadcountInput('42')).toEqual({ ok: true, value: 42 });
+    expect(parseHeadcountInput(' 0 ')).toEqual({ ok: true, value: 0 });
+  });
+
+  it('rejects negative, fractional and non-numeric input', () => {
+    expect(parseHeadcountInput('-1').ok).toBe(false);
+    expect(parseHeadcountInput('3.5').ok).toBe(false);
+    expect(parseHeadcountInput('many').ok).toBe(false);
   });
 });

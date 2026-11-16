@@ -43,6 +43,54 @@
   `?submit=<sessionId>&token=<token>` (or enter the passcode); expiry
   is checked server-side from `qr_token_issued_at` +
   `qr_expires_in_seconds`.
+- **Headcount confirmed at activation (Phase 4, v0.5.0):** the
+  headcount entered at session creation is only an expected number.
+  The lecturer counts the real bodies in the hall just before
+  projecting the QR code, and confirms (or corrects) the count in the
+  monitor when starting the session. The confirmed count is stored on
+  the session with the activation and is the number the
+  headcount-vs-submissions flag compares against.
+
+## Smart verification (Phase 4 slice 1, v0.5.0 — implemented, untested live)
+
+The intended lecture flow: the lecturer takes the physical headcount,
+then projects the QR code; students scan it (or use the 6-digit
+passcode beside it when their phone has no camera) to mark
+attendance. Students never register — public submission, registration
+number only.
+
+- **Lecturer-anchored location.** When a session is activated, the
+  lecturer's device location is captured in the browser and stored on
+  the session (`anchor_latitude`, `anchor_longitude`,
+  `anchor_accuracy_meters`, `anchor_captured_at`). An activation
+  without a usable location is refused — no silent fallback. The
+  radius is **30 metres** (product-owner rule 2026-11-16: if the
+  student and the lecturer are in the same location and the distance
+  is not above 30 m, the student is eligible; above 30 m the
+  submission is rejected).
+- **Mandatory student location.** Every submission must carry the
+  student's device coordinates. A submission without coordinates is
+  refused (`location_required`). The server computes the Haversine
+  distance from the session anchor and rejects beyond the radius
+  (`outside_location`), or when the reported accuracy is worse than
+  100 m (`location_too_imprecise`). The check applies identically to
+  the QR-token path and the passcode path. Client-side distance math
+  is display-only; the server decides. Sessions activated before
+  v0.5.0 have no anchor and refuse submissions until closed and
+  reopened.
+- **Device binding.** Each submission carries the SHA-256 hash of a
+  device fingerprint (screen, user agent, timezone, hardware,
+  canvas — only the hash ever leaves the phone). The first
+  submission binds a device to one registration number, across all
+  sessions; a later submission from the same device for a different
+  number is refused, and one device may submit once per session. A
+  per-browser localStorage flag is a UX hint only. Manual attendance
+  stays lecturer-attested, with no location/device checks.
+- **Honest limits.** GPS can be spoofed with mock-location apps,
+  indoor GPS drifts 10–20 m, and a fingerprint is a hashed
+  deterrent, not a proof of identity. These checks verify the phone,
+  not the person. No facial liveness in this slice (spec: only after
+  a privacy/feasibility review).
 
 ## Lifecycle
 
@@ -90,6 +138,12 @@ must be recorded in the audit log. Any transition to `active`
   between headcount and submissions.
 - **A headcount discrepancy is not automatic evidence of fraud.**
   It is a number to review, not a verdict.
+- **Headcount-mismatch flag (Phase 4, v0.5.0):** when verified +
+  manual submissions exceed the confirmed physical headcount, the
+  monitor shows a review flag ("Submissions exceed the physical
+  headcount — review"). It is display only — it never changes a
+  status, never rejects a submission, and never calls a student a
+  fraud. It compares against the headcount confirmed at activation.
 
 ## Manual attendance and corrections
 

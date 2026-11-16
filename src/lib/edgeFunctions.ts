@@ -13,6 +13,7 @@
  */
 
 import { isSupabaseConfigured, supabase, supabaseConfig } from './supabase';
+import type { GeoCoords } from './geo';
 import type { AttendanceRecord, AttendanceRecordStatus, SessionStatus } from '@/types/database';
 
 export interface EdgeError {
@@ -118,7 +119,18 @@ async function callFunction<T>(
 export interface TransitionResponse {
   ok: true;
   warning?: string;
-  session: { id: string; status: SessionStatus; qr_expires_in_seconds: number; qr_token_issued_at: string | null };
+  session: {
+    id: string;
+    status: SessionStatus;
+    headcount: number | null;
+    qr_expires_in_seconds: number;
+    qr_token_issued_at: string | null;
+    anchor_latitude: number | null;
+    anchor_longitude: number | null;
+    anchor_accuracy_meters: number | null;
+    anchor_captured_at: string | null;
+    location_radius_meters: number;
+  };
   /** Present only on activation, and only in this response. */
   token: string | null;
   passcode: string | null;
@@ -139,15 +151,36 @@ export interface ManualResponse {
 
 // ------------------------------------------------------------------ calls
 
+export interface TransitionOptions {
+  reason?: string;
+  /**
+   * Lecturer anchor (Phase 4): the lecturer's device location at
+   * activation. Required by the server for any transition TO
+   * 'active'; ignored otherwise.
+   */
+  anchor?: GeoCoords;
+  /**
+   * Confirmed physical headcount (Phase 4): the count just taken in
+   * the hall. Sent only with activation; ignored otherwise.
+   */
+  headcount?: number;
+}
+
 /** Move a session between lifecycle states (lecturer, authenticated). */
 export function transitionSession(
   sessionId: string,
   to: SessionStatus,
-  reason?: string,
+  options?: TransitionOptions,
 ): Promise<EdgeResult<TransitionResponse>> {
   return callFunction<TransitionResponse>(
     'session-transition',
-    { sessionId, to, reason: reason ?? undefined },
+    {
+      sessionId,
+      to,
+      reason: options?.reason ?? undefined,
+      anchor: options?.anchor ?? undefined,
+      headcount: options?.headcount ?? undefined,
+    },
     { auth: true },
   );
 }
@@ -158,6 +191,20 @@ export interface SubmitAttendanceInput {
   token?: string;
   passcode?: string;
   idempotencyKey: string;
+  /**
+   * Phase 4 — mandatory student location. The server rejects the
+   * submission without coordinates, beyond the session radius, or
+   * with accuracy worse than 100 m.
+   */
+  latitude: number;
+  longitude: number;
+  /** Reported accuracy in metres, or null when the device gives none. */
+  accuracy: number | null;
+  /**
+   * Phase 4 — SHA-256 device-fingerprint hash (64 hex chars). Only
+   * the hash is ever sent; raw device attributes never leave the phone.
+   */
+  deviceFingerprint: string;
 }
 
 /** Public student submission — no auth. At least one of token / passcode is required. */

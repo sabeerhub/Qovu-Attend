@@ -116,6 +116,23 @@ export function headcountDifference(
   };
 }
 
+/**
+ * Parse the headcount the lecturer confirms at activation. Blank
+ * means "keep the stored headcount" (null); anything else must be a
+ * whole number of 0 or more.
+ */
+export function parseHeadcountInput(
+  raw: string,
+): { ok: true; value: number | null } | { ok: false; error: string } {
+  const trimmed = raw.trim();
+  if (trimmed === '') return { ok: true, value: null };
+  const value = Number(trimmed);
+  if (!Number.isInteger(value) || value < 0) {
+    return { ok: false, error: 'Headcount must be a whole number of 0 or more.' };
+  }
+  return { ok: true, value };
+}
+
 /** Statuses a manual entry may be corrected to (server-enforced too). */
 export const CORRECTABLE_STATUSES: readonly AttendanceRecordStatus[] = [
   'verified',

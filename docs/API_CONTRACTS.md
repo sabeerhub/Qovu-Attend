@@ -1,8 +1,8 @@
 # API Contracts — UniAttend
 
-This is the Phase 2 contract surface. There is no custom REST API:
+This is the Phase 2 + Phase 4 (v0.5.0) contract surface. There is no custom REST API:
 the frontend talks to Supabase (PostgREST + Auth) and to Supabase
-Edge Functions (Phase 2). This document states the contracts so the
+Edge Functions (Phase 2, smart verification in Phase 4). This document states the contracts so the
 client and server can never drift apart silently.
 
 ## Conventions
@@ -126,7 +126,11 @@ Request:
   "registrationNumber": "FUT/2022/001",
   "token": "base64url-token-from-qr",
   "passcode": "123456",
-  "idempotencyKey": "sub-<sessionId>-<NORMALISED-REG-NO>"
+  "idempotencyKey": "sub-<sessionId>-<NORMALISED-REG-NO>",
+  "latitude": 11.7594,
+  "longitude": 9.3392,
+  "accuracy": 12,
+  "deviceFingerprint": "<64-hex sha256>"
 }
 ```
 
@@ -134,6 +138,21 @@ Request:
 `idempotencyKey` is the stable per-(session, student) key built by
 `buildIdempotencyKey` in `src/lib/submission.ts`; a retry with the same
 key returns the original record instead of creating a second row.
+
+Phase 4 (v0.5.0) — location and device are mandatory on every
+submission, on both the QR-token path and the passcode path.
+`latitude` / `longitude` are the student's device coordinates;
+`accuracy` is the reported accuracy in metres (null when the device
+gives none). `deviceFingerprint` is the SHA-256 hash (64 hex chars)
+of the device fingerprint — only the hash is ever sent. The server
+rejects a submission without coordinates (`location_required`), more
+than 30 m from the lecturer anchor captured at activation
+(`outside_location`), with accuracy worse than 100 m
+(`location_too_imprecise`), or from a device already bound to another
+registration number (`device_bound_to_another_student`) or that
+already submitted in this session (`device_already_used`). A session
+with no anchor (activated before v0.5.0) refuses submissions until
+closed and reopened (`location_not_configured`).
 
 Success (200):
 
@@ -152,12 +171,18 @@ Errors:
 
 | HTTP | code | Meaning |
 |---|---|---|
-| 400 | `invalid_request` | Missing sessionId / registrationNumber, or neither token nor passcode supplied |
+| 400 | `invalid_request` | Missing sessionId / registrationNumber, or neither token nor passcode supplied; or a malformed fingerprint / accuracy |
+| 400 | `location_required` | No student coordinates supplied — location is mandatory |
+| 400 | `location_too_imprecise` | Reported accuracy worse than 100 m |
 | 401 | `invalid_token` | Token/passcode hash does not match the session |
+| 403 | `outside_location` | Student is more than 30 m from the lecturer anchor |
+| 403 | `device_bound_to_another_student` | Device is already bound to a different registration number |
 | 404 | `session_not_found` | No such session |
 | 409 | `session_not_active` | Session is not `active` |
+| 409 | `location_not_configured` | Session has no location anchor (activated before v0.5.0) — close and reopen it |
+| 409 | `device_already_used` | This device already submitted in this session |
 | 410 | `token_expired` | `now >= qr_token_issued_at + qr_expires_in_seconds` (checked server-side) |
-| 429 | `rate_limited` | More than 60 submissions for this session in a minute (best-effort, in-memory, single-instance guard — not a production-grade distributed limiter) |
+| 429 | `rate_limited` | More than 300 submissions for this session in a minute (best-effort, in-memory, single-instance guard — not a production-grade distributed limiter) |
 | 500 | `server_error` / `not_configured` | Server or function-configuration failure |
 
 ### `session-transition` — lecturer lifecycle transitions (auth required)
@@ -170,7 +195,7 @@ id in the request body is never trusted).
 Request:
 
 ```json
-{ "sessionId": "uuid", "to": "active", "reason": "optional note" }
+{ "sessionId": "uuid", "to": "active", "reason": "optional note", "anchor": { "latitude": 11.7594, "longitude": 9.3392, "accuracy": 12 }, "headcount": 42 }
 ```
 
 `to` is one of `draft | active | closed | finalized | archived`.
@@ -179,10 +204,20 @@ The server enforces the same transition table as
 duplicated in the function because Deno cannot import the frontend
 lib — the single source of truth is `docs/ATTENDANCE_RULES.md`.
 
+Phase 4 (v0.5.0): any transition TO `active` requires `anchor` —
+the lecturer's device location at activation (latitude −90…90,
+longitude −180…180, `accuracy` in metres when the device gives it).
+Without a usable anchor the activation is refused (`anchor_required`,
+400) — no silent fallback. The anchor is stored on the session with
+the capture time; the radius is the server-side default (30 m).
+`headcount` (integer ≥ 0, optional, activation only) is the physical
+count just taken in the hall, stored on the session; a headcount sent
+with a non-activation transition is ignored.
+
 Success (200):
 
 ```json
-{ "ok": true, "session": { "id": "uuid", "status": "active", "qr_expires_in_seconds": 300, "qr_token_issued_at": "…" }, "token": "…", "passcode": "123456" }
+{ "ok": true, "session": { "id": "uuid", "status": "active", "headcount": 42, "qr_expires_in_seconds": 300, "qr_token_issued_at": "…", "anchor_latitude": 11.7594, "anchor_longitude": 9.3392, "anchor_accuracy_meters": 12, "anchor_captured_at": "…", "location_radius_meters": 30 }, "token": "…", "passcode": "123456" }
 ```
 
 `token` and `passcode` are present ONLY on a transition to `active`
@@ -200,6 +235,7 @@ Errors:
 | HTTP | code | Meaning |
 |---|---|---|
 | 400 | `invalid_request` | Missing sessionId or invalid `to` |
+| 400 | `anchor_required` | Activation without a usable lecturer location anchor |
 | 401 | `unauthorized` | No valid lecturer session |
 | 403 | `forbidden` | Session belongs to another lecturer |
 | 404 | `session_not_found` | No such session |

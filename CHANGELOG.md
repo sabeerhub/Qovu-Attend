@@ -1,5 +1,65 @@
 # Changelog — UniAttend
 
+## v0.5.0 — 2026-11-16 — Smart verification: lecturer-anchored location, device binding, headcount confirm
+
+- **Lecturer-anchored location (Phase 4 slice 1, product-owner decisions 2026-11-16).**
+  When a session is activated, the lecturer's device location is captured in the browser and
+  stored on the session as the anchor. Every student submission must carry the student's
+  device coordinates — a submission without a location is refused, with no fallback — and
+  the `attendance-submit` Edge Function checks server-side (Haversine) that the student is
+  within the session's radius of the anchor. **Radius is 30 metres** (owner's rule: if the
+  student and the lecturer are in the same location and the distance is not above 30 m the
+  student is eligible; above 30 m the submission is rejected). A reported accuracy worse
+  than 100 m is refused as too imprecise. The check applies identically to the QR-token
+  path and the passcode path; client-side distance math is display-only. Sessions activated
+  before v0.5.0 have no anchor and refuse submissions until closed and reopened. An
+  activation without a usable lecturer location is refused (`anchor_required`) — no silent
+  fallback. The monitor shows the anchor state after activation (captured time, accuracy,
+  radius).
+- **Device binding (Phase 4 slice 1).** The submission page computes a device fingerprint
+  (screen, user agent, timezone, hardware, canvas — hashed with SHA-256; only the hash
+  ever leaves the phone) and sends it with every submission. Server-side, the first
+  submission binds a device to one registration number (`device_registrations`, unique on
+  the hash); a later submission from the same device for a different number is refused
+  (`device_bound_to_another_student`), and one device may submit once per session (partial
+  unique index on `(session_id, device_fingerprint_hash)`). A per-browser localStorage flag
+  is a UX hint only — the server enforces. Manual attendance stays lecturer-attested, with
+  no location/device checks, audit-logged as before.
+- **Headcount confirmed at activation.** The headcount was only an expected number entered
+  at session creation; the lecturer counts real bodies in the hall just before projecting
+  the QR. The monitor now shows a "Physical headcount — confirm now" field when starting
+  (or reopening) a session, prefilled with the stored count, saved to the session with the
+  activation call. When verified + manual submissions exceed the confirmed headcount the
+  monitor shows a review flag ("Submissions exceed the physical headcount — review") —
+  display only, never automatic fraud, per the spec rule.
+- **Projector QR.** `QrDisplay` gains a fullscreen projector view (large high-contrast QR
+  + big passcode, minimal chrome, Esc to close) so the code reads from the back of the hall.
+  The QR is now rendered at 560 px for a crisp projection.
+- **Submission rate limit raised (Phase 4 addition).** `attendance-submit` went from 60 to
+  **300 submissions per session per minute**: a full Nigerian lecture hall scanning at once
+  must not hit the limiter. Still the same in-memory best-effort guard, not a distributed
+  limiter.
+- **Honest limits, stated in `docs/SECURITY_MODEL.md`:** GPS can be spoofed with
+  mock-location apps, indoor GPS drifts 10–20 m, and a fingerprint is a hashed deterrent,
+  not a proof of identity. Location + device checks verify the phone, not the person;
+  they are mitigations, not guarantees. No facial liveness in this slice (spec: only after
+  a privacy/feasibility review). No student registration or accounts were added.
+- New migration `supabase/migrations/20261116020000_smart_verification.sql` (existing
+  migrations untouched): anchor columns + `location_radius_meters` (default 30) on
+  `attendance_sessions`; `device_fingerprint_hash` on `attendance_records` + partial unique
+  index; new `device_registrations` table (RLS on, no policies — service role only).
+- Client: new pure `src/lib/geo.ts` (Haversine, radius/accuracy rules, Geolocation wrapper)
+  and `src/lib/deviceFingerprint.ts` (stable fingerprint + SHA-256, injectable for tests,
+  localStorage flag helpers); `src/lib/edgeFunctions.ts` payloads carry the anchor,
+  headcount, coordinates and fingerprint; `SessionMonitor` / `SessionList` capture the
+  lecturer location before activation; `SubmitAttendance` blocks without location or
+  fingerprint and maps the new server error codes to plain language.
+- Tests: `tests/unit/geo.test.ts` (Haversine known distances, radius/accuracy rules),
+  `tests/unit/deviceFingerprint.test.ts` (hash stability, known SHA-256 vector,
+  no-window-at-import), `tests/unit/submission.test.ts` (headcount-confirm parsing),
+  `tests/integration/edge-functions.test.ts` (anchor + headcount sent on activation,
+  location + fingerprint sent on submission).
+
 ## v0.4.1 — 2026-11-16 — Lecturer sets lecture date, start time and week freely
 
 - **Session creation unblocked (spec change, product-owner decision 2026-11-16).**

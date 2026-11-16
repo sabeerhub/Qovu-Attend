@@ -1,6 +1,8 @@
-// attendance-submit — public student attendance submission (Phase 2).
+// attendance-submit — public student attendance submission (Phase 2,
+// smart verification added Phase 4 v0.5.0).
 //
-// POST { sessionId, registrationNumber, token?, passcode?, idempotencyKey }
+// POST { sessionId, registrationNumber, token?, passcode?, idempotencyKey,
+//        latitude, longitude, accuracy?, deviceFingerprint }
 // No student account and no Authorization header are required: the
 // caller is authorized by the short-lived QR token (from scanning the
 // lecturer's QR code) or the classroom passcode — at least one must be
@@ -16,18 +18,48 @@
 //   4. Registration number normalised (trim + uppercase).
 //   5. Idempotency: a row with the same (session_id, idempotency_key)
 //      is returned as-is (200, duplicate: true, retried: true).
-//   6. Uniqueness: the DB unique constraint on (session_id,
+//   6. Location (Phase 4): the submission MUST carry the student's
+//      device coordinates. Missing/invalid coordinates are refused
+//      (400 location_required) — there is no submission without a
+//      location, and no fallback. The server computes the Haversine
+//      distance from the session's lecturer anchor (captured at
+//      activation) and rejects when it exceeds the session's
+//      location_radius_meters (403 outside_location), or when the
+//      reported accuracy is worse than 100 m (400
+//      location_too_imprecise). The check applies identically to the
+//      QR-token path and the passcode path. Client-side distance math
+//      is display-only; the server decides. A session with no anchor
+//      (activated before v0.5.0) refuses submissions until it is
+//      closed and reopened (409 location_not_configured).
+//   7. Device binding (Phase 4): the submission MUST carry the
+//      SHA-256 device-fingerprint hash (64 hex chars; raw device
+//      attributes never leave the phone). The first submission binds
+//      the device to one registration number
+//      (device_registrations, unique on the hash); a later
+//      submission from the same device for a different registration
+//      number is refused (403 device_bound_to_another_student).
+//      One device may submit once per session (partial unique index
+//      on (session_id, device_fingerprint_hash); a second attempt
+//      maps to 409 device_already_used).
+//   8. Uniqueness: the DB unique constraint on (session_id,
 //      registration_number) is the backstop; a violation maps to
 //      409 duplicate_registration (the student already submitted).
-//   7. Record inserted with status 'verified' and verification_method
-//      'qr' or 'passcode', derived server-side.
+//   9. Record inserted with status 'verified' and verification_method
+//      'qr' or 'passcode', derived server-side, plus the device
+//      fingerprint hash.
 //
-// Rate limiting: a small in-memory per-session window (60 submissions
-// per session per minute). This is a best-effort guard for a single
-// function instance — it is NOT a production-grade distributed rate
-// limiter, and it resets when the instance is recycled. If abuse is
-// a concern, put a managed limiter (e.g. Supabase rate limits /
-// Cloudflare) in front of this function.
+// Rate limiting: a small in-memory per-session window (300 submissions
+// per session per minute — a full lecture hall scanning at once).
+// This is a best-effort guard for a single function instance — it is
+// NOT a production-grade distributed rate limiter, and it resets
+// when the instance is recycled. If abuse is a concern, put a
+// managed limiter (e.g. Supabase rate limits / Cloudflare) in front
+// of this function.
+//
+// Honest limits (see docs/SECURITY_MODEL.md): location and device
+// checks are mitigations, not guarantees. GPS can be spoofed with
+// mock-location apps, indoor GPS drifts, and a fingerprint is a
+// hashed deterrent, not a proof of identity.
 //
 // UNTESTED: this function has not been run against a live Supabase
 // project. Deploy to staging first and exercise the success /
@@ -38,14 +70,22 @@ import {
   corsHeaders,
   createServiceClient,
   errorResponse,
+  haversineMeters,
+  isValidLatitude,
+  isValidLongitude,
   jsonResponse,
   normalizeRegistrationNumber,
   sha256Hex,
 } from '../_shared/server.ts';
 
 // --- Best-effort in-memory rate limit (see header note) ---
+// 300 per session per minute: a full Nigerian lecture hall scanning
+// the QR at once must not hit the limiter.
 const RATE_WINDOW_MS = 60_000;
-const RATE_MAX_PER_WINDOW = 60;
+const RATE_MAX_PER_WINDOW = 300;
+
+// A reported position less accurate than this is not trusted.
+const MAX_LOCATION_ACCURACY_METERS = 100;
 const rateBuckets = new Map<string, { count: number; windowStart: number }>();
 
 function isRateLimited(sessionId: string): boolean {
@@ -65,7 +105,13 @@ type SubmitBody = {
   token?: unknown;
   passcode?: unknown;
   idempotencyKey?: unknown;
+  latitude?: unknown;
+  longitude?: unknown;
+  accuracy?: unknown;
+  deviceFingerprint?: unknown;
 };
+
+const FINGERPRINT_RE = /^[0-9a-f]{64}$/;
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
@@ -91,6 +137,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const idempotencyKey = typeof body.idempotencyKey === 'string'
     ? body.idempotencyKey.trim()
     : '';
+  const latitude = body.latitude;
+  const longitude = body.longitude;
+  const accuracy = body.accuracy;
+  const deviceFingerprint =
+    typeof body.deviceFingerprint === 'string' ? body.deviceFingerprint.trim() : '';
 
   if (!sessionId) return errorResponse('invalid_request', 'sessionId is required.', 400);
   if (!registrationNumber) {
@@ -98,6 +149,30 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
   if (!token && !passcode) {
     return errorResponse('invalid_request', 'A QR token or classroom passcode is required.', 400);
+  }
+  // Location and device fingerprint are mandatory for every
+  // submission (Phase 4). Validate the shapes here; the values are
+  // checked against the session anchor below.
+  if (!isValidLatitude(latitude) || !isValidLongitude(longitude)) {
+    return errorResponse(
+      'location_required',
+      'Location is required to mark attendance. Turn on location services and try again.',
+      400,
+    );
+  }
+  if (
+    accuracy !== null &&
+    accuracy !== undefined &&
+    !(typeof accuracy === 'number' && Number.isFinite(accuracy) && accuracy >= 0)
+  ) {
+    return errorResponse('invalid_request', 'accuracy must be a number of metres (0 or more) when supplied.', 400);
+  }
+  if (!FINGERPRINT_RE.test(deviceFingerprint)) {
+    return errorResponse(
+      'invalid_request',
+      'A device fingerprint is required to mark attendance. Use a device and browser that support it.',
+      400,
+    );
   }
 
   if (isRateLimited(sessionId)) {
@@ -118,7 +193,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   // 1. Session must exist and be active.
   const { data: session, error: sessionError } = await supabase
     .from('attendance_sessions')
-    .select('id, status, qr_token_hash, qr_token_issued_at, passcode_hash, qr_expires_in_seconds')
+    .select('id, status, qr_token_hash, qr_token_issued_at, passcode_hash, qr_expires_in_seconds, anchor_latitude, anchor_longitude, location_radius_meters')
     .eq('id', sessionId)
     .maybeSingle();
   if (sessionError) {
@@ -168,7 +243,90 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
   }
 
-  // 6 + 7. Insert; the unique constraint is the duplicate backstop.
+  // 6. Location (Phase 4): the server decides, from the lecturer
+  //    anchor captured at activation. No anchor, no submission.
+  const anchorLat = session.anchor_latitude as number | null;
+  const anchorLon = session.anchor_longitude as number | null;
+  if (
+    anchorLat === null ||
+    anchorLat === undefined ||
+    anchorLon === null ||
+    anchorLon === undefined
+  ) {
+    return errorResponse(
+      'location_not_configured',
+      'This session was started before location checks. Ask the lecturer to close and reopen it.',
+      409,
+    );
+  }
+  const reportedAccuracy =
+    typeof accuracy === 'number' ? accuracy : null;
+  if (reportedAccuracy !== null && reportedAccuracy > MAX_LOCATION_ACCURACY_METERS) {
+    return errorResponse(
+      'location_too_imprecise',
+      'Your location is too imprecise to verify. Move somewhere with a clearer GPS signal and try again.',
+      400,
+    );
+  }
+  const radius = Number(session.location_radius_meters ?? 30);
+  const distance = haversineMeters(
+    { latitude: anchorLat, longitude: anchorLon },
+    { latitude: latitude as number, longitude: longitude as number },
+  );
+  if (distance > radius) {
+    return errorResponse(
+      'outside_location',
+      'You are too far from the lecture hall to submit attendance for this session.',
+      403,
+    );
+  }
+
+  // 7. Device binding (Phase 4): one device, one registration
+  //    number. First submission binds the device; a later one for a
+  //    different number is refused.
+  const { data: binding, error: bindingError } = await supabase
+    .from('device_registrations')
+    .select('device_fingerprint_hash, registration_number')
+    .eq('device_fingerprint_hash', deviceFingerprint)
+    .maybeSingle();
+  if (bindingError) {
+    return errorResponse('server_error', bindingError.message, 500);
+  }
+  if (binding && binding.registration_number !== registrationNumber) {
+    return errorResponse(
+      'device_bound_to_another_student',
+      'This device is already registered to another student. Use the device that belongs to this registration number.',
+      403,
+    );
+  }
+  if (!binding) {
+    const { error: bindError } = await supabase.from('device_registrations').insert({
+      device_fingerprint_hash: deviceFingerprint,
+      registration_number: registrationNumber,
+    });
+    if (bindError) {
+      // Race: another request bound this device first. Re-read; if
+      // it is bound to someone else, refuse, otherwise proceed.
+      if ((bindError as { code?: string }).code === '23505') {
+        const { data: raced } = await supabase
+          .from('device_registrations')
+          .select('registration_number')
+          .eq('device_fingerprint_hash', deviceFingerprint)
+          .maybeSingle();
+        if (raced && raced.registration_number !== registrationNumber) {
+          return errorResponse(
+            'device_bound_to_another_student',
+            'This device is already registered to another student. Use the device that belongs to this registration number.',
+            403,
+          );
+        }
+      } else {
+        return errorResponse('server_error', bindError.message, 500);
+      }
+    }
+  }
+
+  // 8 + 9. Insert; the unique constraints are the duplicate backstops.
   const { data: record, error: insertError } = await supabase
     .from('attendance_records')
     .insert({
@@ -177,12 +335,26 @@ Deno.serve(async (req: Request): Promise<Response> => {
       status: 'verified',
       verification_method: verificationMethod,
       idempotency_key: idempotencyKey || null,
+      device_fingerprint_hash: deviceFingerprint,
     })
     .select('id, session_id, registration_number, status, verification_method, submitted_at')
     .single();
 
   if (insertError) {
-    // Postgres unique-violation (23505) on (session_id, registration_number).
+    // Postgres unique-violation (23505). Distinguish the two
+    // backstops by constraint name: a device that already submitted
+    // in this session, vs. a registration number that already did.
+    const message = (insertError as { message?: string }).message ?? '';
+    if (
+      (insertError as { code?: string }).code === '23505' &&
+      message.includes('attendance_records_session_device_unique')
+    ) {
+      return errorResponse(
+        'device_already_used',
+        'This device has already submitted attendance for this session.',
+        409,
+      );
+    }
     if ((insertError as { code?: string }).code === '23505') {
       const { data: existing } = await supabase
         .from('attendance_records')

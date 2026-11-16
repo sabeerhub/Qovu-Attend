@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { supabase } from '@/lib/supabase';
 import { canTransitionSession, isFinalized } from '@/lib/attendance';
+import { locationErrorMessage, requestDeviceLocation, type GeoCoords } from '@/lib/geo';
 import {
   canEditSessionRecords,
   headcountDifference,
+  parseHeadcountInput,
   summarizeRecords,
   validateCorrection,
   validateManualAttendance,
@@ -51,6 +53,13 @@ const ACTION_LABELS: Record<string, string> = {
  * the submitted registration numbers with their statuses, manual
  * attendance, corrections, and the lifecycle controls.
  *
+ * Phase 4 (v0.5.0): starting a session captures the lecturer's
+ * device location as the anchor (refused without it) and confirms
+ * the physical headcount just counted in the hall; the monitor
+ * shows the anchor state and flags it for review — never as
+ * automatic fraud — when verified + manual submissions exceed the
+ * confirmed headcount.
+ *
  * All writes go through Edge Functions; the client never writes a
  * record or an audit row directly.
  */
@@ -69,6 +78,9 @@ export function SessionMonitor({
 }) {
   const [session, setSession] = useState(initialSession);
   const [activation, setActivation] = useState<ActivationResult | null>(initialActivation);
+  const [headcountInput, setHeadcountInput] = useState(
+    initialSession.headcount === null ? '' : String(initialSession.headcount),
+  );
   const [recordsState, setRecordsState] = useState<
     | { status: 'loading' }
     | { status: 'error'; message: string }
@@ -114,13 +126,40 @@ export function SessionMonitor({
   const records = recordsState.status === 'ready' ? recordsState.records : [];
   const summary = summarizeRecords(records);
   const diff = headcountDifference(session.headcount, summary.total);
+  // Review flag (Phase 4): verified + manual past the confirmed
+  // physical headcount. A flag to review — never automatic fraud.
+  const exceedsHeadcount =
+    session.headcount !== null && summary.verified + summary.manual > session.headcount;
   const editable = canEditSessionRecords(session.status);
   const readOnly = isFinalized(session.status);
+  const canActivate = canTransitionSession(session.status, 'active');
 
   async function runTransition(to: SessionStatus) {
     setNotice(null);
+    // Activation (Phase 4): the lecturer's location is the anchor,
+    // and the headcount is confirmed from the count just taken in
+    // the hall. Without a location the session does not start.
+    let anchor: GeoCoords | undefined;
+    let confirmedHeadcount: number | undefined;
+    if (to === 'active') {
+      const parsed = parseHeadcountInput(headcountInput);
+      if (!parsed.ok) {
+        setNotice({ kind: 'error', text: parsed.error });
+        return;
+      }
+      confirmedHeadcount = parsed.value ?? undefined;
+      const location = await requestDeviceLocation();
+      if (!location.ok || !location.coords) {
+        setNotice({
+          kind: 'error',
+          text: `Your location is required to start a session. ${locationErrorMessage(location.error ?? 'unavailable')}`,
+        });
+        return;
+      }
+      anchor = location.coords;
+    }
     setActing(to);
-    const result = await transitionSession(session.id, to);
+    const result = await transitionSession(session.id, to, { anchor, headcount: confirmedHeadcount });
     setActing(null);
     if (!result.ok) {
       setNotice({ kind: 'error', text: result.error.message });
@@ -131,7 +170,19 @@ export function SessionMonitor({
       kind: 'success',
       text: result.data.warning ?? `${label} — now ${result.data.session.status}.`,
     });
-    setSession((s) => ({ ...s, status: result.data.session.status }));
+    setSession((s) => ({
+      ...s,
+      status: result.data.session.status,
+      headcount: result.data.session.headcount,
+      anchor_latitude: result.data.session.anchor_latitude,
+      anchor_longitude: result.data.session.anchor_longitude,
+      anchor_accuracy_meters: result.data.session.anchor_accuracy_meters,
+      anchor_captured_at: result.data.session.anchor_captured_at,
+      location_radius_meters: result.data.session.location_radius_meters,
+    }));
+    if (result.data.session.headcount !== null) {
+      setHeadcountInput(String(result.data.session.headcount));
+    }
     if (result.data.token && result.data.passcode && result.data.session.qr_token_issued_at) {
       setActivation({
         token: result.data.token,
@@ -229,6 +280,32 @@ export function SessionMonitor({
         />
       ) : null}
 
+      {session.status === 'active' ? (
+        session.anchor_latitude !== null && session.anchor_longitude !== null ? (
+          <p
+            className="rounded-xl border border-line bg-surface px-4 py-3 text-[13px] text-muted shadow-card"
+            role="status"
+          >
+            Location locked — anchor captured{' '}
+            {session.anchor_captured_at
+              ? new Date(session.anchor_captured_at).toLocaleString()
+              : 'at activation'}
+            {session.anchor_accuracy_meters !== null
+              ? ` · accuracy ±${Math.round(session.anchor_accuracy_meters)} m`
+              : ''}
+            {` · students must be within ${session.location_radius_meters} m of your position.`}
+          </p>
+        ) : (
+          <p
+            className="rounded-xl border border-line bg-surface px-4 py-3 text-[13px] text-danger shadow-card"
+            role="alert"
+          >
+            This session was started before location checks — student submissions will be refused
+            until it is closed and reopened.
+          </p>
+        )
+      ) : null}
+
       <section>
         <h3 className="mb-4 text-[17px] font-semibold text-ink">Monitoring</h3>
         {recordsState.status === 'loading' ? (
@@ -261,6 +338,19 @@ export function SessionMonitor({
                 ? 'No physical headcount was recorded for this session, so no difference can be shown.'
                 : `Headcount ${session.headcount} minus ${summary.total} submissions is ${diff.difference}. A difference is a number to review — it is not automatic evidence of fraud.`}
             </p>
+            {exceedsHeadcount ? (
+              <p
+                className="mt-3 rounded-lg border border-line bg-canvas px-3 py-2 text-[13px] text-ink"
+                role="status"
+              >
+                <span className="font-medium">
+                  Submissions exceed the physical headcount — review.
+                </span>{' '}
+                Verified + manual ({summary.verified + summary.manual}) is more than the
+                headcount of {session.headcount}. This is a flag to review, not automatic
+                evidence of fraud.
+              </p>
+            ) : null}
           </>
         )}
       </section>
@@ -420,29 +510,48 @@ export function SessionMonitor({
             not available for finalized sessions.
           </p>
         ) : (
-          <div className="flex flex-wrap gap-3">
-            {LIFECYCLE_ACTIONS.filter((a) => canTransitionSession(session.status, a.to)).map(
-              (action) => {
-                // Reopen (closed → active) is labelled differently from Start (draft → active).
-                const label =
-                  action.to === 'active' && session.status === 'closed'
-                    ? 'Reopen session'
-                    : action.label;
-                return (
-                  <Button
-                    key={action.to}
-                    variant={action.variant}
-                    disabled={acting !== null}
-                    onClick={() => void runTransition(action.to)}
-                  >
-                    {acting === action.to ? 'Working…' : label}
-                  </Button>
-                );
-              },
-            )}
-            {LIFECYCLE_ACTIONS.filter((a) => canTransitionSession(session.status, a.to)).length === 0 ? (
-              <p className="text-[13px] text-muted">No further transitions are available for this session.</p>
+          <div className="flex flex-col gap-4">
+            {canActivate ? (
+              <label className="flex max-w-md flex-col gap-1.5 text-[13px] font-medium text-ink">
+                Physical headcount — confirm now
+                <Input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={headcountInput}
+                  onChange={(e) => setHeadcountInput(e.target.value)}
+                  placeholder="Count the students in the hall"
+                />
+                <span className="text-[13px] font-normal text-muted">
+                  Count the students in the hall now, before you project the QR code.
+                  Submissions are checked against this number.
+                </span>
+              </label>
             ) : null}
+            <div className="flex flex-wrap gap-3">
+              {LIFECYCLE_ACTIONS.filter((a) => canTransitionSession(session.status, a.to)).map(
+                (action) => {
+                  // Reopen (closed → active) is labelled differently from Start (draft → active).
+                  const label =
+                    action.to === 'active' && session.status === 'closed'
+                      ? 'Reopen session'
+                      : action.label;
+                  return (
+                    <Button
+                      key={action.to}
+                      variant={action.variant}
+                      disabled={acting !== null}
+                      onClick={() => void runTransition(action.to)}
+                    >
+                      {acting === action.to ? 'Working…' : label}
+                    </Button>
+                  );
+                },
+              )}
+              {LIFECYCLE_ACTIONS.filter((a) => canTransitionSession(session.status, a.to)).length === 0 ? (
+                <p className="text-[13px] text-muted">No further transitions are available for this session.</p>
+              ) : null}
+            </div>
           </div>
         )}
         {session.status === 'finalized' && canTransitionSession(session.status, 'archived') ? (

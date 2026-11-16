@@ -79,6 +79,40 @@ describe('session-transition client', () => {
     expect(fetchCalls[0].init.headers).toMatchObject({ Authorization: 'Bearer lecturer-jwt' });
   });
 
+  it('sends the lecturer anchor and confirmed headcount on activation', async () => {
+    stubFetch({
+      status: 200,
+      body: {
+        ok: true,
+        session: {
+          id: 's1',
+          status: 'active',
+          headcount: 42,
+          qr_expires_in_seconds: 300,
+          qr_token_issued_at: '2026-11-15T10:00:00.000Z',
+          anchor_latitude: 11.123,
+          anchor_longitude: 8.456,
+          anchor_accuracy_meters: 12,
+          anchor_captured_at: '2026-11-15T10:00:00.000Z',
+          location_radius_meters: 50,
+        },
+        token: 'tok-abc',
+        passcode: '123456',
+      },
+    });
+    const result = await transitionSession('s1', 'active', {
+      anchor: { latitude: 11.123, longitude: 8.456, accuracy: 12 },
+      headcount: 42,
+    });
+    expect(result.ok).toBe(true);
+    expect(JSON.parse(String(fetchCalls[0].init.body))).toEqual({
+      sessionId: 's1',
+      to: 'active',
+      anchor: { latitude: 11.123, longitude: 8.456, accuracy: 12 },
+      headcount: 42,
+    });
+  });
+
   it('maps an illegal transition (409) to its server code and message', async () => {
     stubFetch({
       status: 409,
@@ -115,7 +149,38 @@ describe('attendance-submit client', () => {
     registrationNumber: 'FUT/2022/001',
     token: 'tok-abc',
     idempotencyKey: 'sub-s1-FUT/2022/001',
+    latitude: 11.123456,
+    longitude: 8.123456,
+    accuracy: 12,
+    deviceFingerprint: 'a'.repeat(64),
   };
+
+  it('sends location and device fingerprint with the submission', async () => {
+    stubFetch({
+      status: 200,
+      body: {
+        ok: true,
+        duplicate: false,
+        retried: false,
+        record: {
+          id: 'r1',
+          session_id: 's1',
+          registration_number: 'FUT/2022/001',
+          status: 'verified',
+          verification_method: 'qr',
+          submitted_at: '2026-11-15T10:01:00.000Z',
+        },
+      },
+    });
+    const result = await submitAttendance(input);
+    expect(result.ok).toBe(true);
+    expect(JSON.parse(String(fetchCalls[0].init.body))).toMatchObject({
+      latitude: 11.123456,
+      longitude: 8.123456,
+      accuracy: 12,
+      deviceFingerprint: 'a'.repeat(64),
+    });
+  });
 
   it('submits without auth and returns the record', async () => {
     stubFetch({

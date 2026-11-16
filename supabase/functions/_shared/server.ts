@@ -81,3 +81,39 @@ export async function getCallerLecturerId(req: Request): Promise<string | null> 
 export function normalizeRegistrationNumber(raw: string): string {
   return raw.trim().toUpperCase();
 }
+
+// ------------------------------------------------------------- location
+// Haversine distance (Phase 4). This DUPLICATES the formula in
+// src/lib/geo.ts (haversineMeters) — Deno cannot import the
+// frontend lib, and the client copy is display-only. The server
+// copy here is authoritative; keep the two in step.
+
+export interface GeoCoords {
+  latitude: number;
+  longitude: number;
+}
+
+const EARTH_RADIUS_METERS = 6_371_000;
+
+/** Great-circle distance in metres between two coordinates. */
+export function haversineMeters(a: GeoCoords, b: GeoCoords): number {
+  const toRad = (deg: number): number => (deg * Math.PI) / 180;
+  const dLat = toRad(b.latitude - a.latitude);
+  const dLon = toRad(b.longitude - a.longitude);
+  const lat1 = toRad(a.latitude);
+  const lat2 = toRad(b.latitude);
+  const h =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  return 2 * EARTH_RADIUS_METERS * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/** True when a finite number is a valid latitude (-90..90). */
+export function isValidLatitude(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= -90 && value <= 90;
+}
+
+/** True when a finite number is a valid longitude (-180..180). */
+export function isValidLongitude(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= -180 && value <= 180;
+}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { transitionSession } from '@/lib/edgeFunctions';
+import { locationErrorMessage, requestDeviceLocation } from '@/lib/geo';
 import type { AttendanceSession } from '@/types/database';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -34,7 +35,7 @@ export function SessionList({
         const { data, error } = await supabase
           .from('attendance_sessions')
           .select(
-            'id, course_id, lecturer_id, semester_id, lecture_room_id, title, lecture_date, week_number, headcount, qr_expires_in_seconds, status, created_at, updated_at, courses(code)',
+            'id, course_id, lecturer_id, semester_id, lecture_room_id, title, lecture_date, start_time, week_number, headcount, qr_expires_in_seconds, status, created_at, updated_at, anchor_latitude, anchor_longitude, anchor_accuracy_meters, anchor_captured_at, location_radius_meters, courses(code)',
           )
           .order('lecture_date', { ascending: false });
         if (error) setState({ status: 'error', message: error.message });
@@ -58,8 +59,17 @@ export function SessionList({
 
   async function onActivate(session: SessionRow) {
     setActionError(null);
+    // Activation (Phase 4) needs the lecturer's location anchor.
+    // Without it the session does not start.
+    const location = await requestDeviceLocation();
+    if (!location.ok || !location.coords) {
+      setActionError(
+        `Your location is required to start a session. ${locationErrorMessage(location.error ?? 'unavailable')}`,
+      );
+      return;
+    }
     setActivatingId(session.id);
-    const result = await transitionSession(session.id, 'active');
+    const result = await transitionSession(session.id, 'active', { anchor: location.coords });
     setActivatingId(null);
     if (!result.ok) {
       setActionError(result.error.message);

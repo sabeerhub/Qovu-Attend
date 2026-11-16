@@ -1,6 +1,9 @@
 // session-transition — lecturer session lifecycle transitions (Phase 2).
 //
-// POST { sessionId, to, reason? }
+// POST { sessionId, to, reason?, anchor?, headcount? }
+// Activation (to: 'active') requires anchor { latitude, longitude,
+// accuracy? } — the lecturer's device location — and accepts an
+// optional headcount (the physical count just taken, integer >= 0).
 // Requires the lecturer's Supabase Auth JWT (Authorization: Bearer …).
 // The caller must own the session (lecturer_profiles via auth.uid()
 // matches attendance_sessions.lecturer_id); anything else is 403.
@@ -27,6 +30,22 @@
 // recovered from the database afterwards — if the lecturer leaves the
 // screen, close + reopen the session to issue a new code.
 //
+// Activation (Phase 4, v0.5.0) also REQUIRES the lecturer's device
+// location (`anchor`: { latitude, longitude, accuracy? }): the
+// lecturer's position at activation is the anchor that student
+// submissions are checked against server-side. An activation
+// without a usable anchor is refused (400 `anchor_required`) —
+// there is no silent fallback and no activation without an anchor.
+// The anchor is stored on the session with the capture time; the
+// radius is the server-side default (30 m, column default).
+//
+// The lecturer may also confirm the physical headcount at
+// activation (`headcount`: integer >= 0, taken in the hall just
+// before projecting the QR). It is stored on the session; the
+// headcount-vs-submissions flag in the monitor compares against
+// this confirmed count. A headcount sent with a non-activation
+// transition is ignored.
+//
 // Finalization (closed→finalized) marks records read-only for
 // ordinary use: the frontend hides manual/correction controls and
 // the manual-attendance function refuses finalized sessions.
@@ -41,6 +60,8 @@ import {
   createServiceClient,
   errorResponse,
   getCallerLecturerId,
+  isValidLatitude,
+  isValidLongitude,
   jsonResponse,
   sha256Hex,
 } from '../_shared/server.ts';
@@ -80,7 +101,31 @@ type TransitionBody = {
   sessionId?: unknown;
   to?: unknown;
   reason?: unknown;
+  anchor?: unknown;
+  headcount?: unknown;
 };
+
+type AnchorInput = { latitude: number; longitude: number; accuracy: number | null };
+
+/** Parse and validate the lecturer anchor. Null when it is missing or unusable. */
+function parseAnchor(raw: unknown): AnchorInput | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const { latitude, longitude, accuracy } = raw as Record<string, unknown>;
+  if (!isValidLatitude(latitude) || !isValidLongitude(longitude)) return null;
+  const acc =
+    accuracy === null || accuracy === undefined
+      ? null
+      : typeof accuracy === 'number' && Number.isFinite(accuracy) && accuracy >= 0
+        ? accuracy
+        : null;
+  if (accuracy !== null && accuracy !== undefined && acc === null) return null;
+  return { latitude, longitude, accuracy: acc };
+}
+
+/** Parse a headcount confirm: an integer >= 0, or null when absent/invalid. */
+function parseHeadcount(raw: unknown): number | null {
+  return typeof raw === 'number' && Number.isInteger(raw) && raw >= 0 ? raw : null;
+}
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
@@ -105,6 +150,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return errorResponse('invalid_request', 'sessionId and a valid target status (to) are required.', 400);
   }
   const target = to as SessionStatus;
+  // Activation needs the lecturer's location anchor — refuse
+  // before any auth/ownership work is wasted on a doomed call.
+  const anchor = target === 'active' ? parseAnchor(body.anchor) : null;
+  if (target === 'active' && !anchor) {
+    return errorResponse(
+      'anchor_required',
+      'Your location is required to start a session. Turn on location services, allow location for this site, and try again.',
+      400,
+    );
+  }
+  const confirmedHeadcount = target === 'active' ? parseHeadcount(body.headcount) : null;
 
   const lecturerId = await getCallerLecturerId(req);
   if (!lecturerId) {
@@ -144,22 +200,29 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   // Activation issues a fresh token + passcode; only hashes are stored.
+  // It also stores the lecturer's location anchor (required above)
+  // and, when supplied, the confirmed physical headcount.
   let token: string | null = null;
   let passcode: string | null = null;
   const updates: Record<string, unknown> = { status: target, updated_at: new Date().toISOString() };
-  if (target === 'active') {
+  if (target === 'active' && anchor) {
     token = secureToken();
     passcode = securePasscode();
     updates.qr_token_hash = await sha256Hex(token);
     updates.passcode_hash = await sha256Hex(passcode);
     updates.qr_token_issued_at = new Date().toISOString();
+    updates.anchor_latitude = anchor.latitude;
+    updates.anchor_longitude = anchor.longitude;
+    updates.anchor_accuracy_meters = anchor.accuracy;
+    updates.anchor_captured_at = new Date().toISOString();
+    if (confirmedHeadcount !== null) updates.headcount = confirmedHeadcount;
   }
 
   const { data: updated, error: updateError } = await supabase
     .from('attendance_sessions')
     .update(updates)
     .eq('id', sessionId)
-    .select('id, status, qr_expires_in_seconds, qr_token_issued_at, updated_at')
+    .select('id, status, headcount, qr_expires_in_seconds, qr_token_issued_at, anchor_latitude, anchor_longitude, anchor_accuracy_meters, anchor_captured_at, location_radius_meters, updated_at')
     .single();
   if (updateError || !updated) {
     return errorResponse('server_error', updateError?.message ?? 'Could not update the session.', 500);

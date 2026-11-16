@@ -1,6 +1,12 @@
 import { useState, type FormEvent } from 'react';
 import { buildIdempotencyKey, isValidRegistrationNumber, normalizeRegistrationNumber } from '@/lib/submission';
 import { getSubmitParams, submitAttendance } from '@/lib/edgeFunctions';
+import { locationErrorMessage, requestDeviceLocation } from '@/lib/geo';
+import {
+  getDeviceFingerprint,
+  readSubmittedFlag,
+  writeSubmittedFlag,
+} from '@/lib/deviceFingerprint';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +23,14 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/ui/empty-stat
  * from the token/passcode, and the server decides success, duplicate,
  * expiry or error. When no backend is configured, the honest
  * unavailable state is shown — never a fake confirmation.
+ *
+ * Phase 4 (v0.5.0): location is mandatory — a submission without
+ * the student's device coordinates is refused, and the server
+ * rejects it when the student is outside the lecturer's 30 m radius
+ * or the position is too imprecise. The device fingerprint (SHA-256
+ * hash only) binds one device to one registration number,
+ * server-side. Both checks apply identically to the QR-token path
+ * and the passcode path.
  */
 export function SubmitAttendance() {
   const params = typeof window !== 'undefined' ? getSubmitParams(window.location.search) : null;
@@ -29,6 +43,11 @@ export function SubmitAttendance() {
     | { status: 'error'; code: string; message: string }
   >({ status: 'form' });
   const [formError, setFormError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<string | null>(null);
+  // Per-browser hint only (localStorage): this browser already
+  // submitted for a registration number in this session. The server
+  // enforces device binding; this is just a heads-up, never a block.
+  const browserFlag = params ? readSubmittedFlag(params.sessionId) : null;
 
   if (!isSupabaseConfigured) {
     return (
@@ -76,17 +95,51 @@ export function SubmitAttendance() {
     if (!params) return;
     const normalized = normalizeRegistrationNumber(registrationNumber);
     setState({ status: 'submitting' });
+    // Location is mandatory: no coordinates, no attendance. The
+    // student must allow location for this site.
+    setProgress('Checking your location…');
+    const location = await requestDeviceLocation();
+    if (!location.ok || !location.coords) {
+      setProgress(null);
+      setState({
+        status: 'error',
+        code: 'location_required',
+        message: locationErrorMessage(location.error ?? 'unavailable'),
+      });
+      return;
+    }
+    // Device fingerprint (hash only). Without it the server cannot
+    // enforce one device per student, so the submission is refused.
+    setProgress('Verifying this device…');
+    const deviceFingerprint = await getDeviceFingerprint();
+    if (!deviceFingerprint) {
+      setProgress(null);
+      setState({
+        status: 'error',
+        code: 'device_unavailable',
+        message:
+          'This device could not be verified. Use a phone and browser that support location and device checks.',
+      });
+      return;
+    }
+    setProgress('Submitting your attendance…');
     const result = await submitAttendance({
       sessionId: params.sessionId,
       registrationNumber: normalized,
       token: token ?? undefined,
       passcode: token ? undefined : trimmedPasscode,
       idempotencyKey: buildIdempotencyKey(params.sessionId, normalized),
+      latitude: location.coords.latitude,
+      longitude: location.coords.longitude,
+      accuracy: location.coords.accuracy,
+      deviceFingerprint,
     });
+    setProgress(null);
     if (!result.ok) {
       setState({ status: 'error', code: result.error.code, message: result.error.message });
       return;
     }
+    writeSubmittedFlag(params.sessionId, normalized);
     setState({
       status: 'success',
       registrationNumber: normalized,
@@ -102,7 +155,7 @@ export function SubmitAttendance() {
 
       {state.status === 'submitting' ? (
         <div className="mt-6">
-          <LoadingState label="Submitting your attendance…" />
+          <LoadingState label={progress ?? 'Submitting your attendance…'} />
         </div>
       ) : state.status === 'success' ? (
         <div className="mt-6 rounded-xl border border-line bg-surface px-6 py-10">
@@ -130,7 +183,19 @@ export function SubmitAttendance() {
                     ? 'The QR code or passcode is not valid for this session. Check it and try again.'
                     : state.code === 'rate_limited'
                       ? 'Too many submissions right now. Wait a minute and try again.'
-                      : state.message
+                      : state.code === 'location_required'
+                        ? 'Location is required to mark attendance. Turn on location services, allow location for this site, and try again.'
+                        : state.code === 'location_not_configured'
+                          ? 'This session was started before location checks. Ask your lecturer to close and reopen it.'
+                          : state.code === 'location_too_imprecise'
+                            ? 'Your location is too imprecise to verify. Move somewhere with a clearer GPS signal and try again.'
+                            : state.code === 'outside_location'
+                              ? 'You are too far from the lecture hall to submit attendance for this session.'
+                              : state.code === 'device_bound_to_another_student'
+                                ? 'This device is already registered to another student. Use the device that belongs to this registration number.'
+                                : state.code === 'device_already_used'
+                                  ? 'This device has already submitted attendance for this session.'
+                                  : state.message
             }
             onRetry={() => setState({ status: 'form' })}
           />
@@ -139,8 +204,14 @@ export function SubmitAttendance() {
         <form onSubmit={(e) => void onSubmit(e)} className="mt-6 flex flex-col gap-4">
           <p className="text-[13px] text-muted">
             Enter your registration number to record attendance for this session. No account is
-            needed.
+            needed. Your location is required — attendance is only recorded while you are in
+            the lecture hall — and one device can only submit for one student.
           </p>
+          {browserFlag ? (
+            <p className="rounded-lg border border-line bg-canvas px-3 py-2 text-[13px] text-muted" role="status">
+              This browser already submitted attendance for {browserFlag} in this session.
+            </p>
+          ) : null}
           <label className="flex flex-col gap-1.5 text-[13px] font-medium text-ink">
             Registration number
             <Input

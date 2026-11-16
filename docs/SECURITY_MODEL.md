@@ -75,13 +75,51 @@ nothing. Do not treat them as verified until that test has run.
   which use the service-role key server-side only. The frontend never
   sees that key, and the client never submits an attendance status.
 - Rate limiting on attendance submissions (best-effort in-memory
-  guard, 60/session/minute — not a production-grade distributed
-  limiter) and idempotency protection for retries (stable
-  per-(session, student) key, unique index on
+  guard, 300/session/minute — raised from 60 in v0.5.0 so a full
+  lecture hall scanning at once does not hit the limiter; still not a
+  production-grade distributed limiter) and idempotency protection
+  for retries (stable per-(session, student) key, unique index on
   `(session_id, idempotency_key)`, duplicate retries return the
   original record) are server-side concerns (Phase 2 Edge Functions).
 - Every manual entry and correction records lecturer, timestamp,
   reason and previous/new status in `attendance_audit_logs`.
+
+## Smart verification (Phase 4, v0.5.0)
+
+- **Lecturer-anchored location.** Activation captures the lecturer's
+  device location and stores it on the session as the anchor; the
+  radius is 30 m. Every student submission must carry device
+  coordinates, and the `attendance-submit` function checks the
+  Haversine distance server-side. A submission without coordinates
+  is refused; client-side distance math is display-only and is never
+  trusted. Sessions activated before v0.5.0 have no anchor and refuse
+  submissions until closed and reopened.
+- **Device binding.** Each submission carries the SHA-256 hash of a
+  device fingerprint (screen, user agent, timezone, hardware,
+  canvas). Only the hash is sent or stored — raw device attributes
+  never leave the phone. The first submission binds a device to one
+  registration number (`device_registrations`, unique on the hash);
+  one device may submit once per session (partial unique index on
+  `(session_id, device_fingerprint_hash)`).
+- **Honest limits — read these before trusting the checks.** These
+  are mitigations, not guarantees:
+  - GPS can be spoofed with mock-location apps; a student who fakes
+    their coordinates can pass the distance check. Location verifies
+    the reported position, not the person.
+  - Indoor GPS drifts 10–20 m. A 30 m radius with a drifting fix can
+    falsely reject an honest student at the back of the hall; that is
+    why a reported accuracy worse than 100 m is refused outright
+    rather than trusted.
+  - A fingerprint is a hashed deterrent, not a proof of identity. A
+    second phone, a wiped browser, or a spoofed fingerprint defeats
+    device binding. It catches the common case (one phone submitting
+    for several students); it does not make proxy attendance
+    impossible.
+  - The physical headcount is the check no phone can fake — it is
+    the cross-check against the other two, and its mismatch flag is
+    review-only, never automatic fraud.
+- No facial liveness in this slice (spec: only after a
+  privacy/feasibility review). No student accounts were added.
 
 ## Exports
 

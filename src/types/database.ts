@@ -110,6 +110,19 @@ export interface AttendanceSession {
   qr_token_issued_at: string | null;
   /** SHA-256 hash of the classroom passcode, or null before first activation. */
   passcode_hash: string | null;
+  /**
+   * Phase 4 — lecturer anchor: the lecturer's device location at
+   * activation. Student submissions are checked server-side against
+   * this point. Null on sessions activated before v0.5.0 (those
+   * refuse submissions until closed and reopened).
+   */
+  anchor_latitude: number | null;
+  anchor_longitude: number | null;
+  /** Reported GPS accuracy in metres at capture, or null when the device gave none. */
+  anchor_accuracy_meters: number | null;
+  anchor_captured_at: string | null;
+  /** Allowed distance in metres from the anchor (default 50). */
+  location_radius_meters: number;
 }
 
 export interface AttendanceRecord {
@@ -122,7 +135,25 @@ export interface AttendanceRecord {
   manual_reason: string | null;
   /** Stable per-(session, student) key; a retried submission returns the original record. */
   idempotency_key: string | null;
+  /**
+   * Phase 4 — SHA-256 hash of the submitting device's fingerprint.
+   * Hash only; raw device attributes never leave the phone. Null on
+   * manual records (lecturer-attested, no device check).
+   */
+  device_fingerprint_hash: string | null;
   submitted_at: string;
+}
+
+/**
+ * Phase 4 — device binding. First submission from a device locks it
+ * to one registration number, across all sessions. Only the hash is
+ * stored; there is no row here a lecturer can read from the client
+ * (service-role only, via the Edge Functions).
+ */
+export interface DeviceRegistration {
+  device_fingerprint_hash: string;
+  registration_number: string;
+  first_seen_at: string;
 }
 
 export interface AttendanceAuditLog {

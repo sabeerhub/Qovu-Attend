@@ -3,7 +3,11 @@
 Source of truth for the schema is the migrations in
 `supabase/migrations/`. This document describes them; the migrations
 are authoritative. All 12 tables from spec §11, plus the Phase 2
-columns added by `20261115010000_session_qr_tokens.sql`.
+columns added by `20261115010000_session_qr_tokens.sql`, the
+lecturer-course RPC added by `20261116000000`, the `start_time`
+column added by `20261116010000`, and the Phase 4 smart-verification
+columns + `device_registrations` table added by
+`20261116020000_smart_verification.sql`.
 
 ## Tables
 
@@ -132,6 +136,11 @@ via the unique constraint. See `docs/API_CONTRACTS.md`.
 | qr_token_hash | text, nullable | **Phase 2:** SHA-256 hash of the live QR token. Never the token itself. Added by `20261115010000_session_qr_tokens.sql` |
 | qr_token_issued_at | timestamptz, nullable | **Phase 2:** when the live token was issued; expiry = this + `qr_expires_in_seconds`, checked server-side |
 | passcode_hash | text, nullable | **Phase 2:** SHA-256 hash of the 6-digit classroom passcode. Never the passcode itself |
+| anchor_latitude | double precision, nullable | **Phase 4 (v0.5.0):** lecturer's device latitude at activation. Added by `20261116020000_smart_verification.sql` |
+| anchor_longitude | double precision, nullable | **Phase 4 (v0.5.0):** lecturer's device longitude at activation |
+| anchor_accuracy_meters | double precision, nullable | **Phase 4 (v0.5.0):** reported GPS accuracy in metres at capture |
+| anchor_captured_at | timestamptz, nullable | **Phase 4 (v0.5.0):** when the anchor was captured |
+| location_radius_meters | integer, not null, default 30 | **Phase 4 (v0.5.0):** allowed distance in metres from the anchor; check > 0 |
 | created_at / updated_at | timestamptz, default now() | |
 
 Session status transitions are enforced in application/Edge Function
@@ -149,8 +158,23 @@ itself only restricts the value set.
 | verification_method | text | e.g. `qr`, `manual`, `passcode` |
 | manual_reason | text | required in practice for manual entries (enforced server-side) |
 | idempotency_key | text, nullable | **Phase 2:** stable per-(session, student) key; unique index on `(session_id, idempotency_key)` where not null, so a retried submission returns the original record |
+| device_fingerprint_hash | text, nullable | **Phase 4 (v0.5.0):** SHA-256 hash of the submitting device's fingerprint. Hash only; raw attributes never leave the phone. Null on manual records. Added by `20261116020000_smart_verification.sql` |
 | submitted_at | timestamptz, default now() | |
 | **unique (session_id, registration_number)** | | **A reg. no. cannot be duplicated within a session** |
+| **unique index (session_id, device_fingerprint_hash) where not null** | | **Phase 4 (v0.5.0): one device, one submission per session** |
+
+### device_registrations (Phase 4, v0.5.0)
+First submission binds a device to one registration number, across all sessions.
+| Column | Type | Notes |
+|---|---|---|
+| device_fingerprint_hash | text PK | SHA-256 hash only; never raw device attributes |
+| registration_number | text, not null | The one student this device is bound to |
+| first_seen_at | timestamptz, default now() | |
+| index on registration_number | | Lookup by student |
+
+RLS is on with no policies: only the Edge Functions (service role) read and write
+this table. The frontend never touches it. Added by
+`20261116020000_smart_verification.sql`.
 
 ### attendance_audit_logs
 Immutable audit events. No update/delete path is provided in the app.
@@ -194,3 +218,10 @@ signed-in lecturer may read the reference tables `departments`,
 have options. Course creation itself is server-side only, through
 the `create_lecturer_course` RPC — there is no direct client insert
 policy on `courses` or `lecturer_assignments`.
+
+v0.5.0 addition (`20261116020000_smart_verification.sql`): the
+`device_registrations` table has RLS on with no policies (service
+role only, via the Edge Functions). The anchor columns on
+`attendance_sessions` and `device_fingerprint_hash` on
+`attendance_records` are written only by the Edge Functions, never
+by the client directly.
