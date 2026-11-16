@@ -4,6 +4,7 @@ import {
   headcountDifference,
   isDuplicateRegistration,
   isValidRegistrationNumber,
+  mapPasscodeValidation,
   normalizeRegistrationNumber,
   parseHeadcountInput,
   summarizeRecords,
@@ -150,5 +151,64 @@ describe('headcount confirm at activation', () => {
     expect(parseHeadcountInput('-1').ok).toBe(false);
     expect(parseHeadcountInput('3.5').ok).toBe(false);
     expect(parseHeadcountInput('many').ok).toBe(false);
+  });
+});
+
+describe('mapPasscodeValidation — /submit Continue outcome (v0.5.5)', () => {
+  it('advances to the attendance form when the server says the code is valid', () => {
+    expect(
+      mapPasscodeValidation({ ok: true, data: { ok: true, valid: true } }),
+    ).toEqual({ advance: true, error: null });
+  });
+
+  it('stays on the code screen with the "not right" message for a wrong code', () => {
+    expect(
+      mapPasscodeValidation({
+        ok: false,
+        unavailable: false,
+        error: { code: 'invalid_token', message: 'The passcode is not valid for a live session right now.' },
+      }),
+    ).toEqual({
+      advance: false,
+      error: 'That code is not right. Check the code your lecturer is showing and try again.',
+    });
+  });
+
+  it('stays with a wait-a-minute message when rate-limited', () => {
+    expect(
+      mapPasscodeValidation({
+        ok: false,
+        unavailable: false,
+        error: { code: 'rate_limited', message: 'Too many code checks.' },
+        status: 429,
+      }),
+    ).toEqual({ advance: false, error: 'Too many tries. Wait a minute and try again.' });
+  });
+
+  it('stays with a connection message when the service cannot be reached', () => {
+    expect(
+      mapPasscodeValidation({
+        ok: false,
+        unavailable: true,
+        error: { code: 'unreachable', message: 'Could not reach the attendance service.' },
+      }),
+    ).toEqual({
+      advance: false,
+      error: 'Could not check the code right now. Check your connection and try again.',
+    });
+  });
+
+  it('stays with a try-again message on a server error', () => {
+    expect(
+      mapPasscodeValidation({
+        ok: false,
+        unavailable: true,
+        error: { code: 'server_error', message: 'Something went wrong.' },
+        status: 500,
+      }),
+    ).toEqual({
+      advance: false,
+      error: 'Could not check the code right now. Check your connection and try again.',
+    });
   });
 });

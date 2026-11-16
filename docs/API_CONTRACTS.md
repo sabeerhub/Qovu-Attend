@@ -122,9 +122,49 @@ session details or other sessions' data.
 Since v0.5.4 there is also a passcode entry page at `/submit` (no
 session in the URL) for students who cannot scan the QR code: the
 student types the 6-digit code the lecturer is showing, then the same
-attendance form appears. The code is checked for format on the entry
-page and verified server-side at submission — there is no separate
-"does this code exist" check before the form.
+attendance form appears. Since v0.5.5 the page checks the code with
+the server the moment the student taps Continue (the `validate`
+action below) and says right away if it is wrong — a wrong code never
+reaches the registration-number form. (In v0.5.4 the code was only
+checked for format on the page and verified at submission; the owner
+rightly called that rubbish, and v0.5.5 fixed it.)
+
+Validate-only code check (v0.5.5) — same route, no auth:
+
+```json
+{ "action": "validate", "passcode": "123456" }
+```
+
+The server resolves the passcode exactly as a submission does —
+exactly one ACTIVE session, same token-expiry window
+(`now < qr_token_issued_at + qr_expires_in_seconds`), and a lecturer
+anchor present (a session with no anchor refuses submissions, so its
+code must not validate as "correct") — and answers valid/invalid only:
+
+```json
+{ "ok": true, "valid": true }
+```
+
+A wrong, expired, or inactive code is `401 invalid_token` with the
+same message as the passcode-only resolution below; the answer never
+contains a session id, a course name, or any detail, and never says
+how many sessions matched. Validation is NOT authorization: the full
+submission still re-verifies everything (session, expiry, location,
+device, duplicate) at submit time.
+
+Rate limit (validate only): this action is a brute-force oracle for a
+6-digit code, so it is limited strictly and separately from
+submissions — 60 attempts per client IP per minute (keyed on the first
+entry of `x-forwarded-for`), plus a 2000-per-minute global cap. The
+per-IP number is set above a single student's honest use on purpose:
+a whole lecture hall on shared campus WiFi shares one public IP, so
+30/min could block honest students who mistype. It stays safe
+because a code lives only 5 minutes — at most ~300 guesses per code
+lifetime per IP out of 900,000 possible codes — and the global cap
+stays as flood protection. Over the limit answers `429 rate_limited`. Like the submission limiter it
+is in-memory per function instance (best-effort, resets when the
+instance is recycled); a managed limiter in front of the function
+remains the production-grade answer.
 
 Request:
 
@@ -200,7 +240,7 @@ Errors:
 | 400 | `invalid_request` | Missing registrationNumber, or neither sessionId nor passcode supplied; or a malformed fingerprint / accuracy |
 | 400 | `location_required` | No student coordinates supplied — location is mandatory |
 | 400 | `location_too_imprecise` | Reported accuracy worse than 100 m |
-| 401 | `invalid_token` | Token/passcode hash does not match the session; in the passcode-only flow also when zero or more than one active session matches the passcode |
+| 401 | `invalid_token` | Token/passcode hash does not match the session; in the passcode-only flow also when zero or more than one active session matches the passcode; the `validate` action also answers this when the code is expired or its session has no anchor |
 | 403 | `outside_location` | Student is more than 30 m from the lecturer anchor |
 | 403 | `device_bound_to_another_student` | Device is already bound to a different registration number |
 | 404 | `session_not_found` | No such session |
@@ -208,7 +248,7 @@ Errors:
 | 409 | `location_not_configured` | Session has no location anchor (activated before v0.5.0) — close and reopen it |
 | 409 | `device_already_used` | This device already submitted in this session |
 | 410 | `token_expired` | `now >= qr_token_issued_at + qr_expires_in_seconds` (checked server-side) |
-| 429 | `rate_limited` | More than 300 submissions for this session in a minute (best-effort, in-memory, single-instance guard — not a production-grade distributed limiter) |
+| 429 | `rate_limited` | More than 300 submissions for this session in a minute, or more than 60 `validate` attempts from one client IP in a minute (2000 global per minute) — best-effort, in-memory, single-instance guards, not production-grade distributed limiters |
 | 500 | `server_error` / `not_configured` | Server or function-configuration failure |
 
 ### `session-transition` — lecturer lifecycle transitions (auth required)

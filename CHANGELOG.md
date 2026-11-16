@@ -1,5 +1,50 @@
 # Changelog — UniAttend
 
+## v0.5.5 — 2026-11-16 — The /submit page now checks the code straight away
+
+- **Code checked the moment the student taps Continue (v0.5.5, product-owner
+  correction of a real v0.5.4 mistake).** In v0.5.4 the entry page only
+  checked the code's *format* (six digits) and did not verify whether it
+  was the right code until the final submission — a wrong code sailed
+  through to the registration-number form and only failed at the end.
+  Now the page asks the server first and shows a "Checking code…"
+  state: a right code continues to the attendance form; a wrong code
+  stays on the code screen with "That code is not right. Check the code
+  your lecturer is showing and try again." The QR-link flow
+  (`?submit=<sessionId>&token=<token>`) is untouched.
+- **Validate-only action (server, `attendance-submit`).** `POST
+  { action: 'validate', passcode }` resolves the passcode exactly as a
+  submission does — exactly one ACTIVE session, same token-expiry window,
+  and a lecturer anchor present (a session with no anchor refuses
+  submissions, so its code must not validate as "correct") — and answers
+  valid/invalid only: never a session id, a course name, or any detail,
+  and never how many sessions matched. The full submission still
+  re-verifies everything (session, expiry, location, device, duplicate)
+  at submit time; validation is not authorization.
+- **Brute-force guard.** A validate call is an oracle for a 6-digit
+  code, so it is rate-limited strictly and separately from submissions:
+  60 attempts per client IP per minute, plus a 2000-per-minute global
+  cap. The per-IP number is set above a single student's honest use
+  on purpose: a whole lecture hall on shared campus WiFi shares one
+  public IP, so 30/min could block honest students who mistype. It
+  stays safe because a code lives only 5 minutes — at most ~300
+  guesses per code lifetime per IP out of 900,000 possible codes —
+  and the global cap stays as flood protection. Over the limit
+  answers 429 `rate_limited`. Like the submission limiter it is
+  in-memory per function instance (best-effort, resets when the
+  instance is recycled); a managed limiter in front of the function
+  remains the production-grade answer.
+- Client: `src/features/submission/SubmitEntry.tsx` (checks the code on
+  Continue), `src/lib/edgeFunctions.ts` (`validatePasscode`),
+  `src/lib/submission.ts` (`mapPasscodeValidation` — the pure
+  advance/stay decision, tested); server:
+  `supabase/functions/attendance-submit/index.ts` (`validate` branch),
+  `supabase/functions/attendance-submit/resolveSession.ts`
+  (`validatePasscodeEntry`, `isTokenWindowLive`),
+  `supabase/functions/attendance-submit/validateRateLimit.ts` (new).
+  No migration; the 30 m radius, the token-expiry rules and all
+  location/device rules are unchanged.
+
 ## v0.5.4 — 2026-11-16 — Students without a camera can submit at /submit with the 6-digit code
 
 - **Passcode entry page (v0.5.4, product-owner request: a student who cannot
@@ -28,8 +73,10 @@
 - **Honest notes.** The code is checked for format on the entry page and
   verified server-side at submission — there is no separate "does this
   code exist" check before the form, because no such endpoint exists and
-  none was added. The entry page therefore reports a wrong code the same
-  way the existing passcode path does. There is no index on
+  none was added. *(Superseded in v0.5.5: the validate action now exists
+  and the entry page checks the code on Continue.)* The entry page
+  therefore reports a wrong code the same way the existing passcode path
+  does. There is no index on
   `passcode_hash`, so the lookup scans `attendance_sessions` (one row per
   lecture session — small); no migration was added for this slice.
 - Client: `src/features/submission/SubmitEntry.tsx` (new),

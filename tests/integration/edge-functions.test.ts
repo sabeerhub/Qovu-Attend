@@ -14,7 +14,7 @@ vi.mock('@/lib/supabase', () => ({
   },
 }));
 
-import { correctRecord, manualAdd, submitAttendance, transitionSession } from '@/lib/edgeFunctions';
+import { correctRecord, manualAdd, submitAttendance, transitionSession, validatePasscode } from '@/lib/edgeFunctions';
 
 type StubResponse = { status: number; body: unknown };
 
@@ -343,5 +343,53 @@ describe('manual-attendance client', () => {
     const result = await manualAdd('s1', 'FUT/2022/009', 'No phone');
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe('session_read_only');
+  });
+});
+
+describe('validatePasscode client — /submit code check (v0.5.5)', () => {
+  it('sends a validate action with only the passcode, no auth', async () => {
+    stubFetch({ status: 200, body: { ok: true, valid: true } });
+    const result = await validatePasscode('123456');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data.valid).toBe(true);
+    expect(fetchCalls[0].url).toBe('https://test.supabase.co/functions/v1/attendance-submit');
+    expect(JSON.parse(String(fetchCalls[0].init.body))).toEqual({
+      action: 'validate',
+      passcode: '123456',
+    });
+    // Public call: the anon key, never a lecturer JWT.
+    expect(fetchCalls[0].init.headers).toMatchObject({ Authorization: 'Bearer anon-test-key' });
+  });
+
+  it('maps a wrong code (401 invalid_token) to its server code', async () => {
+    stubFetch({
+      status: 401,
+      body: {
+        ok: false,
+        error: { code: 'invalid_token', message: 'The passcode is not valid for a live session right now.' },
+      },
+    });
+    const result = await validatePasscode('999999');
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe('invalid_token');
+      expect(result.status).toBe(401);
+    }
+  });
+
+  it('maps a rate-limited check (429) to its server code', async () => {
+    stubFetch({
+      status: 429,
+      body: {
+        ok: false,
+        error: { code: 'rate_limited', message: 'Too many code checks. Wait a minute and try again.' },
+      },
+    });
+    const result = await validatePasscode('123456');
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe('rate_limited');
+      expect(result.status).toBe(429);
+    }
   });
 });

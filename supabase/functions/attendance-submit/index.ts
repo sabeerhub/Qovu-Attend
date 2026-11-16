@@ -13,6 +13,20 @@
 // session from SHA-256(passcode) among ACTIVE sessions — exactly
 // one match, or `invalid_token` (see resolveSession.ts).
 //
+// Since v0.5.5 there is also a validate-only action for that entry
+// page: POST { action: 'validate', passcode } checks the code the
+// moment the student taps Continue — right code continues, wrong
+// code is reported immediately. It resolves the session exactly as
+// a submission does (exactly one ACTIVE session, same token-expiry
+// window, anchor present) and answers valid/invalid only — never a
+// session id or any detail. Because it is a brute-force oracle for
+// a 6-digit code it is rate-limited strictly and separately from
+// the submission limiter (60 attempts per client IP per minute,
+// 2000 global per minute; see validateRateLimit.ts). Validation is
+// NOT authorization: the full submission still re-verifies
+// everything (session, expiry, location, device, duplicate) at
+// submit time.
+//
 // Server-side checks, in order:
 //   1. Session exists and status is 'active' (anything else: 409 session_not_active).
 //      With no sessionId, the session is resolved from the passcode
@@ -86,9 +100,11 @@ import {
 } from '../_shared/server.ts';
 import {
   resolveActiveSessionByPasscode,
+  validatePasscodeEntry,
   type ActiveSessionRow,
   type PasscodeSessionQuery,
 } from './resolveSession.ts';
+import { createValidateRateLimiter } from './validateRateLimit.ts';
 
 // --- Best-effort in-memory rate limit (see header note) ---
 // 300 per session per minute: a full Nigerian lecture hall scanning
@@ -99,6 +115,19 @@ const RATE_MAX_PER_WINDOW = 300;
 // A reported position less accurate than this is not trusted.
 const MAX_LOCATION_ACCURACY_METERS = 100;
 const rateBuckets = new Map<string, { count: number; windowStart: number }>();
+
+// Validate-action limiter (v0.5.5): a brute-force oracle for a
+// 6-digit code, so 60 attempts per client IP per minute and a
+// 2000-per-minute global cap — far stricter than submissions.
+const validateRateLimiter = createValidateRateLimiter();
+
+/** First entry of `x-forwarded-for`, or 'unknown' when absent. */
+function clientIp(req: Request): string {
+  const forwarded = req.headers.get('x-forwarded-for');
+  if (!forwarded) return 'unknown';
+  const first = forwarded.split(',')[0]?.trim();
+  return first || 'unknown';
+}
 
 function isRateLimited(sessionId: string): boolean {
   const now = Date.now();
@@ -112,6 +141,7 @@ function isRateLimited(sessionId: string): boolean {
 }
 
 type SubmitBody = {
+  action?: unknown;
   sessionId?: unknown;
   registrationNumber?: unknown;
   token?: unknown;
@@ -124,6 +154,7 @@ type SubmitBody = {
 };
 
 const FINGERPRINT_RE = /^[0-9a-f]{64}$/;
+const PASSCODE_RE = /^\d{6}$/;
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
@@ -141,11 +172,55 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   let sessionId = typeof body.sessionId === 'string' ? body.sessionId.trim() : '';
+  const action = typeof body.action === 'string' ? body.action.trim() : '';
   const registrationNumber = typeof body.registrationNumber === 'string'
     ? normalizeRegistrationNumber(body.registrationNumber)
     : '';
   const token = typeof body.token === 'string' ? body.token.trim() : '';
   const passcode = typeof body.passcode === 'string' ? body.passcode.trim() : '';
+
+  // Validate-only action (v0.5.5): the /submit entry page checks
+  // the code the moment the student taps Continue. This branch
+  // runs before any submission validation and never writes
+  // anything. It answers valid/invalid only — never a session id
+  // or any detail — and the full submission still re-verifies
+  // everything at submit time.
+  if (action === 'validate') {
+    if (validateRateLimiter.isLimited(clientIp(req))) {
+      return errorResponse(
+        'rate_limited',
+        'Too many code checks. Wait a minute and try again.',
+        429,
+      );
+    }
+    if (!PASSCODE_RE.test(passcode)) {
+      return errorResponse(
+        'invalid_request',
+        'A 6-digit classroom passcode is required.',
+        400,
+      );
+    }
+    let validateSupabase;
+    try {
+      validateSupabase = createServiceClient();
+    } catch (err) {
+      return errorResponse('not_configured', err instanceof Error ? err.message : 'Function not configured.', 500);
+    }
+    const passcodeHash = await sha256Hex(passcode);
+    const validated = await validatePasscodeEntry(
+      validateSupabase as unknown as PasscodeSessionQuery,
+      passcodeHash,
+    );
+    if (!validated.ok) {
+      return errorResponse(
+        validated.code,
+        validated.message,
+        validated.code === 'server_error' ? 500 : 401,
+      );
+    }
+    return jsonResponse({ ok: true, valid: true });
+  }
+
   const idempotencyKey = typeof body.idempotencyKey === 'string'
     ? body.idempotencyKey.trim()
     : '';

@@ -8,6 +8,12 @@
 // never accepted for a Draft / Closed / Finalized / Archived
 // session (the query only ever sees `status = 'active'`).
 //
+// Since v0.5.5 the same module also holds `validatePasscodeEntry`:
+// the validate-only check for the /submit entry page, which adds
+// the token-expiry window and the anchor requirement to the
+// resolution above, so a code is only "correct" when a submission
+// with it could actually succeed.
+//
 // This module has no imports on purpose: it is the one piece of
 // Edge Function logic that can be unit-tested under vitest (Deno
 // is not installed in this workspace, and the shared server helpers
@@ -60,6 +66,23 @@ export type ResolveSessionResult =
 export const PASSCODE_SESSION_COLUMNS =
   'id, status, qr_token_hash, qr_token_issued_at, passcode_hash, qr_expires_in_seconds, anchor_latitude, anchor_longitude, location_radius_meters';
 
+const INVALID_CODE_MESSAGE =
+  'The passcode is not valid for a live session right now. Check the code and try again.';
+
+/**
+ * Whether the session's token window is live at `nowMs` — the same
+ * expiry rule the submission path applies (see index.ts step 3):
+ * `now < qr_token_issued_at + qr_expires_in_seconds` (default
+ * 300 s). A missing or unparseable issue time is not live.
+ */
+export function isTokenWindowLive(session: ActiveSessionRow, nowMs: number): boolean {
+  if (!session.qr_token_issued_at) return false;
+  const issuedAt = new Date(session.qr_token_issued_at).getTime();
+  if (Number.isNaN(issuedAt)) return false;
+  const expiresIn = Number(session.qr_expires_in_seconds ?? 300);
+  return nowMs < issuedAt + expiresIn * 1000;
+}
+
 /**
  * Find the one active session whose passcode hash matches. The
  * hash is compared by the database equality on the stored hash —
@@ -81,9 +104,50 @@ export async function resolveActiveSessionByPasscode(
     return {
       ok: false,
       code: 'invalid_token',
-      message:
-        'The passcode is not valid for a live session right now. Check the code and try again.',
+      message: INVALID_CODE_MESSAGE,
     };
   }
   return { ok: true, session: data[0] };
+}
+
+export type ValidatePasscodeResult =
+  | { ok: true }
+  | { ok: false; code: 'invalid_token' | 'server_error'; message: string };
+
+/**
+ * Validate-only check for the /submit entry page (v0.5.5): is this
+ * passcode usable for a submission RIGHT NOW? It resolves the
+ * session exactly as a submission does — exactly one ACTIVE session
+ * — and then applies the same token-expiry window the submission
+ * path applies, plus the anchor requirement: a session with no
+ * lecturer anchor refuses submissions until closed and reopened, so
+ * a code for one must NOT validate as "correct" or the student
+ * would be told it is right and then fail at submission. Location,
+ * device and duplicate checks are per-student and are NOT part of
+ * validation; the full submission re-verifies everything at submit
+ * time. The answer is valid/invalid only — never a session id, a
+ * course name, or any detail, and never how many sessions matched.
+ */
+export async function validatePasscodeEntry(
+  client: PasscodeSessionQuery,
+  passcodeHash: string,
+  nowMs: number = Date.now(),
+): Promise<ValidatePasscodeResult> {
+  const resolved = await resolveActiveSessionByPasscode(client, passcodeHash);
+  if (!resolved.ok) {
+    return { ok: false, code: resolved.code, message: resolved.message };
+  }
+  const session = resolved.session;
+  if (!isTokenWindowLive(session, nowMs)) {
+    return { ok: false, code: 'invalid_token', message: INVALID_CODE_MESSAGE };
+  }
+  if (
+    session.anchor_latitude === null ||
+    session.anchor_latitude === undefined ||
+    session.anchor_longitude === null ||
+    session.anchor_longitude === undefined
+  ) {
+    return { ok: false, code: 'invalid_token', message: INVALID_CODE_MESSAGE };
+  }
+  return { ok: true };
 }

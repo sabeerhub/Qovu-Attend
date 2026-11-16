@@ -149,6 +149,11 @@ export interface ManualResponse {
   record: AttendanceRecord;
 }
 
+export interface ValidatePasscodeResponse {
+  ok: true;
+  valid: true;
+}
+
 // ------------------------------------------------------------------ calls
 
 export interface TransitionOptions {
@@ -218,6 +223,24 @@ export function submitAttendance(
   input: SubmitAttendanceInput,
 ): Promise<EdgeResult<SubmitResponse>> {
   return callFunction<SubmitResponse>('attendance-submit', input, { auth: false });
+}
+
+/**
+ * Validate-only code check for the /submit entry page (v0.5.5) —
+ * no auth. The server checks the 6-digit code the moment the
+ * student taps Continue and answers valid/invalid only; it never
+ * returns a session id or any detail. Validation is NOT
+ * authorization: the full submission still re-verifies everything
+ * at submit time.
+ */
+export function validatePasscode(
+  passcode: string,
+): Promise<EdgeResult<ValidatePasscodeResponse>> {
+  return callFunction<ValidatePasscodeResponse>(
+    'attendance-submit',
+    { action: 'validate', passcode },
+    { auth: false },
+  );
 }
 
 /** Lecturer manual add (registration number + reason, both required). */

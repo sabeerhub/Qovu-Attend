@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { isValidPasscode } from '@/lib/qr';
 import { isSupabaseConfigured } from '@/lib/supabase';
+import { validatePasscode } from '@/lib/edgeFunctions';
+import { mapPasscodeValidation } from '@/lib/submission';
 import { SubmitAttendance } from './SubmitAttendance';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,16 +15,19 @@ import { EmptyState } from '@/components/ui/empty-state';
  * attendance form appears (registration number, then the same
  * location + device checks as the QR path).
  *
- * The code is checked for format here only. It is verified
- * server-side at submission — the server resolves the session from
- * the passcode hash, exactly as the existing passcode path does when
- * the session is already known from the URL. A wrong code is
- * therefore reported by the form as "not valid for this session".
+ * Since v0.5.5 the code is verified with the server the moment the
+ * student taps Continue (the `validate` action on
+ * `attendance-submit`): a right code advances to the form, a wrong
+ * code stays on this screen with an immediate error. The check is
+ * validate-only — it never returns a session id or any detail —
+ * and the full submission still re-verifies everything (session,
+ * expiry, location, device, duplicate) at submit time.
  */
 export function SubmitEntry() {
   const [passcode, setPasscode] = useState('');
   const [resolvedPasscode, setResolvedPasscode] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
 
   if (!isSupabaseConfigured) {
     return (
@@ -59,14 +64,26 @@ export function SubmitEntry() {
     );
   }
 
-  function onContinue(event: FormEvent) {
+  async function onContinue(event: FormEvent) {
     event.preventDefault();
+    if (checking) return;
     setFormError(null);
     if (!isValidPasscode(passcode)) {
       setFormError('Enter the 6-digit code your lecturer is showing.');
       return;
     }
-    setResolvedPasscode(passcode.trim());
+    setChecking(true);
+    try {
+      const result = await validatePasscode(passcode.trim());
+      const outcome = mapPasscodeValidation(result);
+      if (outcome.advance) {
+        setResolvedPasscode(passcode.trim());
+      } else {
+        setFormError(outcome.error);
+      }
+    } finally {
+      setChecking(false);
+    }
   }
 
   return (
@@ -89,6 +106,7 @@ export function SubmitEntry() {
             placeholder="6-digit passcode"
             autoComplete="off"
             autoFocus
+            disabled={checking}
           />
         </label>
         {formError ? (
@@ -96,8 +114,8 @@ export function SubmitEntry() {
             {formError}
           </p>
         ) : null}
-        <Button type="submit" className="self-start">
-          Continue
+        <Button type="submit" className="self-start" disabled={checking}>
+          {checking ? 'Checking code…' : 'Continue'}
         </Button>
       </form>
     </div>

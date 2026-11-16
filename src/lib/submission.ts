@@ -16,6 +16,53 @@
 
 import type { AttendanceRecord, AttendanceRecordStatus } from '@/types/database';
 import { canTransitionSession, isFinalized } from './attendance';
+import type { EdgeResult, ValidatePasscodeResponse } from './edgeFunctions';
+
+/**
+ * Outcome of the /submit entry page's Continue tap (v0.5.5).
+ * Pure decision over the server's validate answer, so the entry
+ * page itself stays a thin presentation component:
+ * - valid → advance to the attendance form;
+ * - invalid code → stay on the code screen with the "not right"
+ *   message; the student never reaches the registration-number
+ *   form with a wrong code;
+ * - rate-limited → stay, with a wait-a-minute message;
+ * - unreachable / server error → stay, with a try-again message.
+ */
+export interface PasscodeContinueOutcome {
+  advance: boolean;
+  error: string | null;
+}
+
+export function mapPasscodeValidation(
+  result: EdgeResult<ValidatePasscodeResponse>,
+): PasscodeContinueOutcome {
+  if (result.ok && result.data.valid) {
+    return { advance: true, error: null };
+  }
+  if (!result.ok) {
+    if (result.error.code === 'invalid_token') {
+      return {
+        advance: false,
+        error: 'That code is not right. Check the code your lecturer is showing and try again.',
+      };
+    }
+    if (result.error.code === 'rate_limited') {
+      return {
+        advance: false,
+        error: 'Too many tries. Wait a minute and try again.',
+      };
+    }
+    return {
+      advance: false,
+      error: 'Could not check the code right now. Check your connection and try again.',
+    };
+  }
+  return {
+    advance: false,
+    error: 'Could not check the code right now. Check your connection and try again.',
+  };
+}
 
 /** Trim surrounding whitespace and uppercase — the canonical form. */
 export function normalizeRegistrationNumber(raw: string): string {
