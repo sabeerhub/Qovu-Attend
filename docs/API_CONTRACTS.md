@@ -112,8 +112,9 @@ Route: `POST <your Supabase project URL>/functions/v1/attendance-submit`.
 No Authorization header / student account required; the caller is
 authorized by the short-lived QR token or the classroom passcode.
 
-Public submission page: `?submit=<sessionId>&token=<token>` (the URL
-the QR code encodes; see `src/lib/qr.ts` `buildSubmitUrl`). Without a
+Public submission page: `?submit=<sessionId>&token=<token>` at the app
+root (the full URL is what the QR code encodes — a phone camera opens
+it directly; see `src/lib/qr.ts` `buildSubmitUrl`). Without a
 `token` in the URL the student enters the 6-digit classroom passcode
 instead. The page asks only for a registration number and shows no
 session details or other sessions' data.

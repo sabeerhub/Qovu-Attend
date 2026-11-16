@@ -1,5 +1,28 @@
 # Changelog — UniAttend
 
+## v0.5.2 — 2026-11-16 — QR codes now open the attendance page when scanned
+
+- **QR code content fixed (v0.5.2, product-owner report: scanning the QR showed
+  raw text instead of opening attendance).** The QR used to encode a JSON
+  payload (`{"v":1,"sessionId":...,"token":...}`), and a phone camera only
+  opens a QR code when it contains a URL — so phones displayed the raw data
+  text instead of the attendance page. The QR now encodes the public
+  submission URL itself (`https://uniattend-x.vercel.app/?submit=<sessionId>&token=<token>`).
+  The URL is at the app root on purpose: this repo has no SPA rewrite, so a
+  `/submit` path would 404 on the host, while `/` always serves the app and
+  AppShell already reads the query string there. The QR image and the
+  displayed "Submission link" text are now built from the same single URL, so
+  the two can never disagree again. The old JSON payload parser
+  (`parseQrPayload`) is removed as dead code — nothing used it except its own
+  tests. Token, passcode, expiry, location and device rules are untouched.
+- Client: `src/lib/qr.ts` (`buildQrPayload` now takes the origin and returns
+  the submission URL; `buildSubmitUrl` builds the root-path URL),
+  `src/features/attendance/QrDisplay.tsx` (one URL built once, used for the
+  QR and the link text); tests: `tests/unit/qr.test.ts` (QR content is a URL
+  on the given origin, token round-trips, URL-unsafe token characters
+  survive); docs: `docs/API_CONTRACTS.md` (QR payload is a submission URL,
+  not JSON).
+
 ## v0.5.1 — 2026-11-16 — Location capture that works indoors: longer fix + explicit permission step
 
 - **Location capture fixed (v0.5.1, product-owner report: activation failed with the

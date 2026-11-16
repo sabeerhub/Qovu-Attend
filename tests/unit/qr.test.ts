@@ -6,7 +6,6 @@ import {
   generatePasscode,
   generateQrToken,
   isTokenExpired,
-  parseQrPayload,
   tokenRemainingSeconds,
 } from '@/lib/qr';
 
@@ -92,19 +91,30 @@ describe('countdown formatting', () => {
 });
 
 describe('QR payload', () => {
-  it('round-trips session id + token', () => {
-    const payload = buildQrPayload('session-1', 'tok-abc');
-    expect(parseQrPayload(payload)).toEqual({ v: 1, sessionId: 'session-1', token: 'tok-abc' });
+  it('encodes the public submission URL at the app root, not JSON', () => {
+    const payload = buildQrPayload('https://uniattend.example', 'session-1', 'tok-abc');
+    expect(payload).toBe('https://uniattend.example/?submit=session-1&token=tok-abc');
+    expect(payload).not.toContain('{');
   });
 
-  it('rejects malformed or foreign payloads', () => {
-    expect(parseQrPayload('not json')).toBeNull();
-    expect(parseQrPayload('{"v":2,"sessionId":"s","token":"t"}')).toBeNull();
-    expect(parseQrPayload('{"sessionId":"s"}')).toBeNull();
-  });
-
-  it('builds the public submission URL', () => {
+  it('builds the public submission URL at the app root', () => {
     const url = buildSubmitUrl('https://uniattend.example', 'session-1', 'tok-abc');
-    expect(url).toBe('https://uniattend.example/submit?submit=session-1&token=tok-abc');
+    expect(url).toBe('https://uniattend.example/?submit=session-1&token=tok-abc');
+  });
+
+  it('round-trips a real generated token through the URL', () => {
+    const token = generateQrToken();
+    const payload = buildQrPayload('https://uniattend.example', 'session-1', token);
+    const parsed = new URL(payload);
+    expect(parsed.origin).toBe('https://uniattend.example');
+    expect(parsed.pathname).toBe('/');
+    expect(parsed.searchParams.get('submit')).toBe('session-1');
+    expect(parsed.searchParams.get('token')).toBe(token);
+  });
+
+  it('survives URL-unsafe token characters (encoded, then decoded back)', () => {
+    const token = 'Ab+C/dEf==';
+    const payload = buildQrPayload('https://uniattend.example', 'session-1', token);
+    expect(new URL(payload).searchParams.get('token')).toBe(token);
   });
 });

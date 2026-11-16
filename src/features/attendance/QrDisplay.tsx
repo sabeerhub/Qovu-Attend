@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import { buildQrPayload, buildSubmitUrl, formatCountdown, tokenRemainingSeconds } from '@/lib/qr';
+import { buildQrPayload, formatCountdown, tokenRemainingSeconds } from '@/lib/qr';
 import { Button } from '@/components/ui/button';
 import { LoadingState } from '@/components/ui/empty-state';
 
 /**
  * QR code + classroom passcode, shown ONCE when a session is
- * activated. The QR encodes the session id + token; the token itself
- * is never stored anywhere — only its hash lives server-side. The
+ * activated. The QR encodes the public submission URL, so a phone
+ * camera opens the attendance page when it scans it; the token
+ * itself is never stored anywhere — only its hash lives server-side. The
  * countdown is display-only: the server decides whether the token
  * is still valid.
  *
@@ -35,10 +36,17 @@ export function QrDisplay({
     tokenRemainingSeconds(issuedAt, expiresInSeconds),
   );
 
+  // One URL, built once: the QR image and the displayed submission
+  // link below both use this exact string, so they can never disagree.
+  const submitUrl =
+    typeof window !== 'undefined'
+      ? buildQrPayload(window.location.origin, sessionId, token)
+      : '';
+
   useEffect(() => {
     let cancelled = false;
     // Rendered large so it stays crisp when projected fullscreen.
-    QRCode.toDataURL(buildQrPayload(sessionId, token), {
+    QRCode.toDataURL(submitUrl, {
       errorCorrectionLevel: 'M',
       margin: 1,
       width: 560,
@@ -55,7 +63,7 @@ export function QrDisplay({
     return () => {
       cancelled = true;
     };
-  }, [sessionId, token]);
+  }, [submitUrl]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -65,10 +73,6 @@ export function QrDisplay({
   }, [issuedAt, expiresInSeconds]);
 
   const expired = remaining <= 0;
-  const submitUrl =
-    typeof window !== 'undefined'
-      ? buildSubmitUrl(window.location.origin, sessionId, token)
-      : '';
 
   // Projector mode closes on Escape.
   useEffect(() => {

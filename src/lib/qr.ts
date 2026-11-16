@@ -82,50 +82,30 @@ export function formatCountdown(totalSeconds: number): string {
   return `${minutes}:${String(remainder).padStart(2, '0')}`;
 }
 
-export interface QrPayload {
-  v: 1;
-  sessionId: string;
-  token: string;
-}
-
 /**
- * The payload the QR code encodes. A student device that scans it
- * opens the public submission page with this session id and token.
- * The payload carries no status, no expiry decision and no identity
- * — the server validates the token hash and the expiry.
- */
-export function buildQrPayload(sessionId: string, token: string): string {
-  const payload: QrPayload = { v: 1, sessionId, token };
-  return JSON.stringify(payload);
-}
-
-/** Parse a QR payload back; returns null when it is not a v1 payload. */
-export function parseQrPayload(raw: string): QrPayload | null {
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (
-      typeof parsed === 'object' &&
-      parsed !== null &&
-      (parsed as Record<string, unknown>).v === 1 &&
-      typeof (parsed as Record<string, unknown>).sessionId === 'string' &&
-      typeof (parsed as Record<string, unknown>).token === 'string'
-    ) {
-      return parsed as QrPayload;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * The public submission URL for a session. Query params (documented
- * in docs/API_CONTRACTS.md): `?submit=<sessionId>&token=<token>`.
- * The token is short-lived; the server is the authority on expiry.
+ * The public submission URL for a session, at the app root.
+ * Query params (documented in docs/API_CONTRACTS.md):
+ * `?submit=<sessionId>&token=<token>`. The token is short-lived;
+ * the server is the authority on expiry. The root path is used
+ * deliberately: this repo has no SPA rewrite, so a `/submit` path
+ * would 404 on the host, while `/` always serves the app and
+ * AppShell already reads the query string there.
  */
 export function buildSubmitUrl(origin: string, sessionId: string, token: string): string {
-  const url = new URL('/submit', origin);
+  const url = new URL('/', origin);
   url.searchParams.set('submit', sessionId);
   url.searchParams.set('token', token);
   return url.toString();
+}
+
+/**
+ * The content the QR code encodes: the public submission URL itself.
+ * A phone camera only opens a QR code when it contains a URL — the
+ * previous JSON payload (`{"v":1,"sessionId":...,"token":...}`) made
+ * phones display raw text instead of opening the attendance page.
+ * The URL carries no status, no expiry decision and no identity —
+ * the server validates the token hash and the expiry.
+ */
+export function buildQrPayload(origin: string, sessionId: string, token: string): string {
+  return buildSubmitUrl(origin, sessionId, token);
 }
