@@ -1,5 +1,23 @@
 # Changelog — UniAttend
 
+## v0.5.3 — 2026-11-16 — Old submission links no longer show "This page doesn't exist"
+
+- **SPA rewrite added (v0.5.3, product-owner report: an old submission link
+  `https://uniattend-x.vercel.app/submit?submit=<sessionId>&token=<token>`
+  returned Vercel 404 NOT_FOUND).** v0.5.2 fixed new links to use the app root,
+  but QR codes and links already out in the world still point at `/submit` —
+  and with no SPA rewrite, the host had no file at that path, so it answered
+  404. The new `vercel.json` at the project root rewrites every path to
+  `index.html`, so old `/submit?...` links now open the app and AppShell reads
+  the session and token from the query string, exactly as it does on the root
+  path. The app has no Vercel server-side routes of its own (the backend is
+  Supabase Edge Functions), and real static files such as JS/CSS assets are
+  still served directly, so the main page and assets are unaffected. Note: a
+  token on an old link may still be expired, and a session created before
+  v0.5.0 may still lack a location anchor — a fresh session is still the
+  recommended test path.
+- Config: `vercel.json` (new, SPA fallback rewrite).
+
 ## v0.5.2 — 2026-11-16 — QR codes now open the attendance page when scanned
 
 - **QR code content fixed (v0.5.2, product-owner report: scanning the QR showed
