@@ -70,8 +70,12 @@ export type LectureDateValidation =
 
 /**
  * Validate a lecture date against its semester. A date must fall
- * inside the semester and inside one of the 15 teaching weeks;
- * anything else is rejected before any network call.
+ * inside the semester and inside one of the 15 teaching weeks.
+ *
+ * Pure utility, kept for the academic calendar. Since v0.4.1 it is
+ * NOT used by session creation: the lecturer sets the lecture date,
+ * start time and week freely, so an out-of-semester date is allowed
+ * there (product-owner decision 2026-11-16, overriding spec §6).
  */
 export function validateLectureDate(
   semester: SemesterDates,

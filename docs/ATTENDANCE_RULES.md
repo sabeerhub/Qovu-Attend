@@ -11,9 +11,13 @@
   is the first 7 days starting on the semester `start_date`; week N
   covers days 7·(N−1) … 7·N−1 after the start date. A lecture date
   that falls outside the semester dates, or beyond week 15, has no
-  week number and is rejected. Session creation cross-checks the
-  chosen week against the week the lecture date falls in — a
-  mismatch is rejected client-side before any network call.
+  derived week — it is only used to *suggest* a week in the session
+  form. Since v0.4.1 (product-owner decision 2026-11-16, overriding
+  spec §6) the lecturer sets the lecture date, start time and week
+  freely: an out-of-semester date is allowed and the chosen week
+  need not match the derived week. Session creation no longer
+  cross-checks the week against the date or rejects dates outside
+  the semester.
 - History is organized by academic session, semester and week.
 
 ## Sessions
@@ -23,7 +27,7 @@
   record collection.
 - Required fields: department (authorized assignment only), course,
   academic session, semester, week number, attendance title / lecture
-  topic, lecture date, lecture room, expected/physically counted
+  topic, lecture date, lecture start time, lecture room, expected/physically counted
   student total, QR expiration duration, classroom verification
   settings.
 - Lecturer, creation timestamp and status are recorded automatically

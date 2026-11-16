@@ -124,6 +124,7 @@ via the unique constraint. See `docs/API_CONTRACTS.md`.
 | lecture_room_id | uuid FK → lecture_rooms, nullable | |
 | title | text, not null | Lecture topic |
 | lecture_date | date, not null | |
+| start_time | time, nullable | Lecture start time (HH:MM), set by the lecturer. Null on sessions created before v0.4.1. Added by `20261116010000_session_start_time.sql` |
 | week_number | integer, not null | **CHECK week_number BETWEEN 1 AND 15** |
 | headcount | integer | expected/physically counted total; check >= 0 when set |
 | qr_expires_in_seconds | integer, default 300 | |

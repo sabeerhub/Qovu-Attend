@@ -1,5 +1,37 @@
 # Changelog — UniAttend
 
+## v0.4.1 — 2026-11-16 — Lecturer sets lecture date, start time and week freely
+
+- **Session creation unblocked (spec change, product-owner decision 2026-11-16).**
+  The lecturer now assigns the lecture date AND start time himself,
+  and the semester date range no longer blocks or rejects a session.
+  This overrides spec §6 (week validated against the academic
+  calendar): a lecture date outside the semester dates is allowed,
+  and the chosen week (1–15) need not match the week the date falls
+  in. The live semester dates were stale example data (First
+  Semester 2025-09-01 → 2026-01-31), so every date was being
+  rejected; the fix is the rule change, not new semester dates.
+- New migration `supabase/migrations/20261116010000_session_start_time.sql`
+  (existing migrations untouched): `attendance_sessions.start_time`
+  (`time`, nullable so existing sessions are unaffected).
+- Client: the session form gains a required "Lecture start time"
+  (`type="time"`, 24-hour HH:MM, validated in `src/lib/sessionForm.ts`)
+  next to the lecture date, and sends `start_time` in the insert
+  payload. When the picked date falls inside the semester, the
+  derived week is suggested in the week select (still
+  lecturer-editable); when it falls outside, there is no suggestion
+  and the chosen week stands. The semester date-range line under the
+  selected course is removed (only academic session + semester name
+  remain). `validateLectureDate` stays in `src/lib/calendar.ts` as a
+  tested pure utility for the academic calendar; it no longer gates
+  session creation.
+- `src/types/database.ts`: `AttendanceSession` gains
+  `start_time: string | null`.
+- Tests: `tests/unit/session-form-validation.test.ts` rewritten for
+  the new behaviour (out-of-semester date valid, week/date mismatch
+  valid, missing/invalid start time rejected) plus tests for
+  `isValidStartTime` and `suggestedWeekForLectureDate`.
+
 ## v0.4.0 — 2026-11-16 — Lecturer-created courses + Apple-style mobile navigation
 
 - **Lecturer-created courses (spec change, product-owner decision 2026-11-16).**

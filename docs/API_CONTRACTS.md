@@ -41,10 +41,12 @@ The client may insert:
   fields as listed in `ATTENDANCE_RULES.md`: `course_id`,
   `semester_id` (derived from the course), `lecture_room_id`
   (nullable, from the department's rooms), `title`, `lecture_date`,
+  `start_time` (24-hour HH:MM, set by the lecturer),
   `week_number`, `headcount` (nullable, >= 0), `qr_expires_in_seconds`
-  (60, 300, 600 or 900). The client validates the week against the
-  lecture date via the academic calendar before inserting
-  (`src/lib/calendar.ts` + `src/lib/sessionForm.ts`); the database
+  (60, 300, 600 or 900). The client validates the week (1–15) and
+  the start time before inserting; the lecture date and week are set
+  freely by the lecturer and are not cross-checked against the
+  semester dates (v0.4.1, product-owner decision). The database
   CHECK (week 1–15, headcount >= 0) is the server-side backstop.
 
 The client must never insert/update/delete:

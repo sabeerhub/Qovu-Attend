@@ -5,6 +5,7 @@ import { weekForDate } from '@/lib/calendar';
 import {
   QR_EXPIRY_OPTIONS,
   hasSessionFormErrors,
+  suggestedWeekForLectureDate,
   validateSessionForm,
   type SessionFormErrors,
 } from '@/lib/sessionForm';
@@ -25,9 +26,15 @@ const QR_EXPIRY_LABELS: Record<number, string> = {
  * from the lecturer's authorized assignments; academic session and
  * semester are derived from the chosen course; lecturer id, timestamp
  * and status='draft' are set by the system, never taken from the form.
- * Week is validated client-side (1–15), cross-checked against the
- * lecture date via the academic calendar, and again by the database
- * CHECK constraint. Multiple sessions per course per week are allowed.
+ * The lecturer sets the lecture date, start time and week freely
+ * (product-owner decision 2026-11-16, overriding spec §6): the
+ * semester date range no longer gates the date, and the chosen week
+ * need not match the week the date falls in. When the picked date
+ * falls inside the semester, the derived week is suggested in the
+ * week select but stays lecturer-editable; when it falls outside,
+ * there is no suggestion and the chosen week stands. Week is
+ * validated client-side (1–15) and again by the database CHECK
+ * constraint. Multiple sessions per course per week are allowed.
  *
  * Classroom passcode (Phase 2): a secure 6-digit passcode is generated
  * server-side when the session is activated, together with the QR
@@ -52,6 +59,7 @@ export function SessionForm({
   const [courseId, setCourseId] = useState('');
   const [title, setTitle] = useState('');
   const [lectureDate, setLectureDate] = useState('');
+  const [startTime, setStartTime] = useState('');
   const [weekNumber, setWeekNumber] = useState(1);
   const [headcount, setHeadcount] = useState('');
   const [qrExpiresInSeconds, setQrExpiresInSeconds] = useState(300);
@@ -74,6 +82,17 @@ export function SessionForm({
     setFieldErrors({});
   }
 
+  /**
+   * When the picked date falls inside the course semester, suggest
+   * the week it falls in (the select stays lecturer-editable); when
+   * it falls outside, leave the week exactly as the lecturer chose it.
+   */
+  function onLectureDateChange(value: string) {
+    setLectureDate(value);
+    const suggested = suggestedWeekForLectureDate(semester, value);
+    if (suggested !== null) setWeekNumber(suggested);
+  }
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
@@ -82,19 +101,17 @@ export function SessionForm({
       setFieldErrors({ weekNumber: 'Week number must be between 1 and 15.' });
       return;
     }
-    const errors = validateSessionForm(
-      {
-        departmentId,
-        courseId,
-        title,
-        lectureDate,
-        weekNumber,
-        headcount: headcount === '' ? null : Number(headcount),
-        qrExpiresInSeconds,
-        lectureRoomId: lectureRoomId === '' ? null : lectureRoomId,
-      },
-      semester,
-    );
+    const errors = validateSessionForm({
+      departmentId,
+      courseId,
+      title,
+      lectureDate,
+      startTime,
+      weekNumber,
+      headcount: headcount === '' ? null : Number(headcount),
+      qrExpiresInSeconds,
+      lectureRoomId: lectureRoomId === '' ? null : lectureRoomId,
+    });
     if (hasSessionFormErrors(errors)) {
       setFieldErrors(errors);
       return;
@@ -111,6 +128,7 @@ export function SessionForm({
       lecture_room_id: lectureRoomId === '' ? null : lectureRoomId,
       title: title.trim(),
       lecture_date: lectureDate,
+      start_time: startTime,
       week_number: weekNumber,
       headcount: headcount === '' ? null : Number(headcount),
       qr_expires_in_seconds: qrExpiresInSeconds,
@@ -125,6 +143,7 @@ export function SessionForm({
     setFieldErrors({});
     setTitle('');
     setLectureDate('');
+    setStartTime('');
     setHeadcount('');
     onCreated();
   }
@@ -177,7 +196,6 @@ export function SessionForm({
       {selectedCourse ? (
         <p className="text-[13px] text-muted">
           {selectedCourse.academicSessionName} · {selectedCourse.semesterName}
-          {semester ? ` · ${semester.start_date} to ${semester.end_date}` : ''}
         </p>
       ) : null}
 
@@ -196,25 +214,42 @@ export function SessionForm({
         ) : null}
       </label>
 
-      <label className="flex flex-col gap-1.5 text-[13px] font-medium text-ink">
-        Lecture date
-        <Input
-          required
-          type="date"
-          value={lectureDate}
-          onChange={(e) => setLectureDate(e.target.value)}
-        />
-        {derivedWeek !== null ? (
-          <span className="text-[13px] font-normal text-muted">
-            This date falls in week {derivedWeek} of the semester.
-          </span>
-        ) : null}
-        {fieldErrors.lectureDate ? (
-          <span className="text-[13px] font-normal text-danger" role="alert">
-            {fieldErrors.lectureDate}
-          </span>
-        ) : null}
-      </label>
+      <div className="grid grid-cols-2 gap-4">
+        <label className="flex flex-col gap-1.5 text-[13px] font-medium text-ink">
+          Lecture date
+          <Input
+            required
+            type="date"
+            value={lectureDate}
+            onChange={(e) => onLectureDateChange(e.target.value)}
+          />
+          {fieldErrors.lectureDate ? (
+            <span className="text-[13px] font-normal text-danger" role="alert">
+              {fieldErrors.lectureDate}
+            </span>
+          ) : null}
+        </label>
+
+        <label className="flex flex-col gap-1.5 text-[13px] font-medium text-ink">
+          Lecture start time
+          <Input
+            required
+            type="time"
+            value={startTime}
+            onChange={(e) => setStartTime(e.target.value)}
+          />
+          {fieldErrors.startTime ? (
+            <span className="text-[13px] font-normal text-danger" role="alert">
+              {fieldErrors.startTime}
+            </span>
+          ) : null}
+        </label>
+      </div>
+      {derivedWeek !== null ? (
+        <p className="text-[13px] text-muted">
+          This date falls in week {derivedWeek} of the semester.
+        </p>
+      ) : null}
 
       <label className="flex flex-col gap-1.5 text-[13px] font-medium text-ink">
         Week number

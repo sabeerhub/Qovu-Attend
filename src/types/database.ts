@@ -96,6 +96,8 @@ export interface AttendanceSession {
   lecture_room_id: string | null;
   title: string;
   lecture_date: string;
+  /** Lecture start time (HH:MM), set by the lecturer. Null on sessions created before v0.4.1. */
+  start_time: string | null;
   week_number: number;
   headcount: number | null;
   qr_expires_in_seconds: number;
