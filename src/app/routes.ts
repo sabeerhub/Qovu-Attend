@@ -6,6 +6,7 @@ export type NavKey =
   | 'sessions'
   | 'history'
   | 'reports'
+  | 'analytics'
   | 'profile';
 
 export const NAV_TITLES: Record<NavKey, string> = {
@@ -16,5 +17,6 @@ export const NAV_TITLES: Record<NavKey, string> = {
   sessions: 'Attendance Sessions',
   history: 'Attendance History',
   reports: 'Reports & Exports',
+  analytics: 'Analytics',
   profile: 'Profile & Settings',
 };

@@ -16,11 +16,12 @@ const ALL_KEYS: NavKey[] = [
   'sessions',
   'history',
   'reports',
+  'analytics',
   'profile',
 ];
 
 describe('mobile navigation grouping', () => {
-  it('shows four tabs on the bar and four items behind More', () => {
+  it('shows four tabs on the bar and five items behind More', () => {
     expect(TAB_BAR_ITEMS.map((item) => item.key)).toEqual([
       'overview',
       'courses',
@@ -31,6 +32,7 @@ describe('mobile navigation grouping', () => {
       'departments',
       'plan',
       'reports',
+      'analytics',
       'profile',
     ]);
   });

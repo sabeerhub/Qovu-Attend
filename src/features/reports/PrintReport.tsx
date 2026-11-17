@@ -26,6 +26,7 @@ import {
   formatPercentage,
   methodLabel,
   statusLabel,
+  type AtRiskReportData,
   type CourseReportData,
   type ReportData,
   type SessionReportData,
@@ -278,6 +279,83 @@ function CoursePrint({ report }: { report: CourseReportData }) {
   );
 }
 
+function AtRiskPrint({ report }: { report: AtRiskReportData }) {
+  const { course } = report;
+  const below = report.rows.filter((row) => row.band === 'below').length;
+  const approaching = report.rows.length - below;
+  return (
+    <div>
+      <h2 className="mt-6 text-[20px] font-semibold text-ink">
+        {course.code} — {course.title}
+      </h2>
+      <p className="mt-1 text-[13px] text-muted">
+        Students at risk · {course.departmentName} · {course.semesterName} ·{' '}
+        {course.academicSessionName}
+      </p>
+
+      <table className="mt-6 w-full text-left text-[13px]">
+        <tbody>
+          <MetaRow label="Department" value={course.departmentName} />
+          <MetaRow label="Course" value={`${course.code} — ${course.title}`} />
+          <MetaRow label="Academic session" value={course.academicSessionName} />
+          <MetaRow label="Semester" value={course.semesterName} />
+          <MetaRow label="Lecturer" value={course.lecturerName} />
+          <MetaRow label="Attendance bar" value={`${course.threshold}%`} />
+          <MetaRow
+            label="Sessions held"
+            value={`${report.heldSessions} of ${report.totalSessions} finished`}
+          />
+          <MetaRow
+            label="On this list"
+            value={`${below} below the bar · ${approaching} close to the bar`}
+          />
+        </tbody>
+      </table>
+
+      <p className="mt-6 text-[13px] text-ink">
+        This list shows students below the bar and close to it, as of the date above, counted
+        from sessions actually held. Only finished sessions (Finalized or Archived) count as
+        held. The exact percentage decides — 74.6% is below a 75% bar. The lecturer and the
+        head of department decide who writes the exam — this list never bans anyone on its own.
+      </p>
+
+      <h3 className="mt-8 text-[14px] font-semibold text-ink">Students at risk</h3>
+      {report.rows.length === 0 ? (
+        <p className="mt-2 text-[13px] text-muted">
+          Nobody is below or close to the bar in this course.
+        </p>
+      ) : (
+        <table className="mt-2 w-full text-left text-[12px]">
+          <thead>
+            <tr className="border-b border-line text-[11px] uppercase text-muted">
+              <th className="py-2 pr-3 font-medium">Registration number</th>
+              <th className="py-2 pr-3 font-medium">Name</th>
+              <th className="py-2 pr-3 font-medium">Attended</th>
+              <th className="py-2 pr-3 font-medium">Held</th>
+              <th className="py-2 pr-3 font-medium">Percentage</th>
+              <th className="py-2 font-medium">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {report.rows.map((row) => (
+              <tr key={row.regNumber} className="border-b border-line">
+                <td className="py-2 pr-3 text-ink">{row.regNumber}</td>
+                <td className="py-2 pr-3 text-ink">{row.studentName ?? '—'}</td>
+                <td className="py-2 pr-3 text-ink">{row.attended}</td>
+                <td className="py-2 pr-3 text-ink">{row.held}</td>
+                <td className="py-2 pr-3 text-ink">{formatPercentage(row.percentage)}</td>
+                <td className="py-2 text-ink">{bandLabel(row.band)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <SignatureArea />
+    </div>
+  );
+}
+
 /**
  * The print view itself. It opens the browser print dialog once it
  * mounts and calls `onDone` when the dialog closes (including on
@@ -314,8 +392,10 @@ export function PrintReport({ report, onDone }: { report: ReportData; onDone: ()
 
       {report.kind === 'session' ? (
         <SessionPrint report={report} />
-      ) : (
+      ) : report.kind === 'course' ? (
         <CoursePrint report={report} />
+      ) : (
+        <AtRiskPrint report={report} />
       )}
 
       <div className="print-footer" aria-hidden="true">

@@ -29,6 +29,7 @@
  */
 import { toCsvWithBom } from './csv';
 import { computeEligibility, isPresentStatus, type EligibilityRow } from './eligibility';
+import { atRiskRows } from './analytics';
 import { isFinalized } from './attendance';
 import { summarizeRecords, type RecordSummary } from './submission';
 import type {
@@ -221,6 +222,10 @@ export function courseCsvFilename(courseCode: string, date: Date = new Date()): 
   return `qovu-${slugify(courseCode)}-attendance-${todayIso(date)}.csv`;
 }
 
+export function atRiskCsvFilename(courseCode: string, date: Date = new Date()): string {
+  return `qovu-${slugify(courseCode)}-at-risk-${todayIso(date)}.csv`;
+}
+
 /** Download a text file in the browser (the StudentImport pattern). */
 export function downloadTextFile(filename: string, content: string, mimeType: string): void {
   const blob = new Blob([content], { type: mimeType });
@@ -363,4 +368,98 @@ export function buildCourseReport(
   };
 }
 
-export type ReportData = SessionReportData | CourseReportData;
+export type ReportData = SessionReportData | CourseReportData | AtRiskReportData;
+
+/** The at-risk list, as the print view renders it (v0.15.0). */
+export interface AtRiskReportData {
+  kind: 'at-risk';
+  generatedAt: string;
+  course: {
+    code: string;
+    title: string;
+    departmentName: string;
+    semesterName: string;
+    academicSessionName: string;
+    lecturerName: string;
+    threshold: number;
+  };
+  heldSessions: number;
+  totalSessions: number;
+  /** Below the bar first, then close to it, worst first. */
+  rows: EligibilityRow[];
+}
+
+/**
+ * Build the at-risk list for one course (pure). The rows are the
+ * eligibility rows themselves — same held-session rule, same exact
+ * percentage, same bands — filtered to below + approaching, so
+ * the printed list can never disagree with the Eligibility
+ * screen. The list is a snapshot as of the generated date: the
+ * lecturer and the head of department decide who writes the exam,
+ * never this list on its own.
+ */
+export function buildAtRiskReport(
+  course: {
+    code: string;
+    title: string;
+    departmentName: string;
+    semesterName: string;
+    academicSessionName: string;
+    lecturerName: string;
+    threshold: number;
+  },
+  rows: EligibilityRow[],
+  heldSessions: number,
+  totalSessions: number,
+  generatedAt: Date = new Date(),
+): AtRiskReportData {
+  return {
+    kind: 'at-risk',
+    generatedAt: generatedAt.toISOString(),
+    course,
+    heldSessions,
+    totalSessions,
+    rows: atRiskRows(rows),
+  };
+}
+
+/** CSV column headers for the at-risk list, in order. */
+export const AT_RISK_CSV_HEADERS = [
+  'Registration number',
+  'Student name',
+  'Course code',
+  'Course title',
+  'Department',
+  'Attended',
+  'Held',
+  'Percentage',
+  'Status',
+] as const;
+
+/**
+ * The at-risk list as CSV — below the bar first, then close to
+ * it, worst first. Formula injection is neutralized by the shared
+ * CSV writer, and the file starts with a UTF-8 BOM so Excel
+ * opens it as UTF-8.
+ */
+export function atRiskRowsToCsv(
+  course: {
+    code: string;
+    title: string;
+    departmentName: string;
+  },
+  rows: EligibilityRow[],
+): string {
+  const csvRows = atRiskRows(rows).map((row) => [
+    row.regNumber,
+    row.studentName,
+    course.code,
+    course.title,
+    course.departmentName,
+    row.attended,
+    row.held,
+    formatPercentage(row.percentage),
+    bandLabel(row.band),
+  ]);
+  return toCsvWithBom([...AT_RISK_CSV_HEADERS], csvRows);
+}

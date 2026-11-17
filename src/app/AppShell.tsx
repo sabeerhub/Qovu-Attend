@@ -22,6 +22,7 @@ import { SessionWorkspace } from '@/features/attendance/SessionWorkspace';
 import type { CreatedDraftSession } from '@/lib/sessionCreation';
 import { HistoryList } from '@/features/history/HistoryList';
 import { ReportsPanel } from '@/features/reports/ReportsPanel';
+import { AnalyticsScreen } from '@/features/analytics/AnalyticsScreen';
 import { ProfileScreen } from '@/features/profile/ProfileScreen';
 import { LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -204,6 +205,7 @@ export function AppShell() {
           ) : null}
           {current === 'history' ? <HistoryList /> : null}
           {current === 'reports' ? <ReportsPanel /> : null}
+          {current === 'analytics' ? <AnalyticsScreen /> : null}
           {current === 'profile' ? <ProfileScreen /> : null}
         </main>
         {/* Floating pill tab bar on mobile; the pb-24 above keeps it

@@ -22,6 +22,7 @@ export const NAV_ITEMS: Array<{ key: NavKey; label: string }> = [
   { key: 'sessions', label: 'Attendance Sessions' },
   { key: 'history', label: 'Attendance History' },
   { key: 'reports', label: 'Reports & Exports' },
+  { key: 'analytics', label: 'Analytics' },
   { key: 'profile', label: 'Profile & Settings' },
 ];
 
@@ -94,7 +95,7 @@ export function Sidebar({
  *
  * Four tabs — Overview, Courses, Sessions, History — plus a "More"
  * tab that opens a bottom sheet with My Departments, My Lecture
- * Plan, Reports & Exports, and Profile & Settings. Five slots fit
+ * Plan, Reports & Exports, Analytics, and Profile & Settings. Five slots fit
  * the pill cleanly at phone width, so the grouping is unchanged
  * from the old full-width bar — nothing moved, nothing hidden.
  * The sheet also carries a Sign out row (icon + label, danger
