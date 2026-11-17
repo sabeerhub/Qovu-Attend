@@ -153,6 +153,20 @@ export interface ManualResponse {
   record: AttendanceRecord;
 }
 
+export interface BulkMarkResponse {
+  ok: true;
+  /** Students newly marked as arrived. */
+  marked: number;
+  /** Students skipped because they already had a record. */
+  skipped: number;
+  /** Students that could not be marked. */
+  failed: number;
+  /** Registration numbers that could not be marked, for the plain-language report. */
+  failedNumbers: string[];
+  /** The attendance stands; something secondary (the audit log) could not be written. */
+  warning?: string;
+}
+
 export interface ValidatePasscodeResponse {
   ok: true;
   valid: true;
@@ -324,6 +338,27 @@ export function reviewFace(
   return callFunction<ManualResponse>(
     'manual-attendance',
     { sessionId, recordId, faceReview, reason },
+    { auth: true },
+  );
+}
+
+/**
+ * Lecturer bulk mark all as arrived (v0.12.0): one tap marks
+ * every student on the course's class list as manual attendance.
+ * The server re-reads the list and skips anyone who already has a
+ * record in this session — nobody is ever counted twice, and a
+ * second run marks nobody new. The shared reason is stored on
+ * every new record and in the audit log, like a single manual add.
+ * The response counts marked / skipped / failed, so a partial
+ * failure is never a silent half-result.
+ */
+export function bulkMarkAll(
+  sessionId: string,
+  reason: string,
+): Promise<EdgeResult<BulkMarkResponse>> {
+  return callFunction<BulkMarkResponse>(
+    'manual-attendance',
+    { sessionId, bulkMarkAll: true, reason },
     { auth: true },
   );
 }

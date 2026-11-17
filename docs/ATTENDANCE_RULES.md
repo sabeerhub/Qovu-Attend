@@ -267,3 +267,34 @@ must be recorded in the audit log. Any transition to `active`
 - Every manual entry and correction records lecturer, timestamp,
   reason, and previous/new status in `attendance_audit_logs`.
 - Finalized historical records cannot be silently rewritten.
+
+### Mark all as arrived (v0.12.0 — implemented, untested live)
+
+- When the lecturer counts everyone in the hall and has no time to
+  add students one by one, one tap in the session workspace marks
+  every student on the course's class list as arrived.
+- **Confirm first.** Before anything is saved, the screen shows the
+  numbers in plain words: students on the list, how many already
+  submitted (these will be skipped), how many will be marked, and
+  the session headcount. When verified + manual after the mark
+  would pass the headcount, the confirm step says so.
+- **Who gets marked:** every student on the course's class list
+  with no record in this session yet. Anyone who already has a
+  record — verified or manual — is skipped, so nobody is ever
+  counted twice, and running it a second time marks nobody new.
+- **With no class list there is nobody to mark:** the button does
+  not appear, and the screen says to add the class list first.
+- **Same session rule as a single manual add:** only finalized and
+  archived sessions refuse it. The mark is server-side, never a
+  client loop — the function re-reads the list and the records, so
+  the client never decides who gets marked.
+- **One shared reason:** every marked record carries "Marked all as
+  arrived by lecturer", and each one gets its own audit-log row
+  (`bulk_manual_attendance`), exactly like a single manual add.
+- **A partial failure is never a silent half-result:** the answer
+  reports how many were marked, how many were skipped, and how
+  many failed, with the numbers that failed — so the lecturer can
+  try again or add the failed ones by hand.
+- **Headcount still applies:** after the mark, verified + manual
+  is compared with the headcount exactly as before, and a mismatch
+  flags the session for review — never automatic fraud.

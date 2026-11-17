@@ -395,20 +395,50 @@ agrees the same face was used for two numbers — the record becomes
 `suspicious` and the flag is cleared. Dismiss means the lecturer
 checked and it is fine — the status stays as it was and the flag is
 cleared. A record that is not flagged is refused with 409
-`face_review_not_flagged`. Exactly one of the three shapes is
+`face_review_not_flagged`. Exactly one of the four shapes is
 accepted per call.
 
-Success (200): `{ "ok": true, "record": { … } }`. All shapes write
+Bulk mark all as arrived (v0.12.0) — request:
+
+```json
+{ "sessionId": "uuid", "bulkMarkAll": true, "reason": "Marked all as arrived by lecturer" }
+```
+
+The server re-reads the course's class list and the session's
+records — the client never decides who gets marked. Every student
+on the list with no record in this session yet is inserted as a
+`manual` record (`verification_method: "manual"`,
+`manual_reason` = the shared reason). Anyone who already has a
+record (verified or manual) is skipped, so nobody is ever counted
+twice and a second run marks nobody new. A course with no class
+list is refused with 409 `empty_class_list`. One audit row per
+marked record (`action: "bulk_manual_attendance"`). Success (200):
+
+```json
+{ "ok": true, "marked": 40, "skipped": 2, "failed": 0, "failedNumbers": [] }
+```
+
+`marked` / `skipped` / `failed` are the counts, and
+`failedNumbers` names the registration numbers that could not be
+marked, so a partial failure is never a silent half-result: if a
+student submits between the list read and the insert, that number
+is just skipped on retry, and a real per-row error is counted as
+failed. If nothing could be marked at all, the function answers a
+plain 500, not a success.
+
+Success (200) for the other shapes: `{ "ok": true, "record": { … } }`. All shapes write
 an `attendance_audit_logs` row (`action: "manual_attendance"`,
-`"correction"`, `"face_review_confirmed"` or
-`"face_review_dismissed"`, previous/new status, reason, lecturer,
+`"correction"`, `"face_review_confirmed"`,
+`"face_review_dismissed"` or `"bulk_manual_attendance"`,
+previous/new status, reason, lecturer,
 timestamp); an audit-write failure is reported as a `warning`, never hidden.
 
 Errors: 400 `invalid_request` (missing reason, more than one shape
 or none, invalid `newStatus` or `faceReview`), 401 `unauthorized`,
 403 `forbidden`, 404 `session_not_found` / `record_not_found`, 409
 `session_read_only` (finalized/archived), `duplicate_registration`
-(manual add) or `face_review_not_flagged` (face review).
+(manual add), `face_review_not_flagged` (face review) or
+`empty_class_list` (bulk mark on a course with no class list).
 
 ### `contact-notify` — email one saved contact report to the owner (v0.8.3, no auth)
 

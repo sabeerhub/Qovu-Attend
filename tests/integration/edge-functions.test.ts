@@ -14,7 +14,7 @@ vi.mock('@/lib/supabase', () => ({
   },
 }));
 
-import { correctRecord, manualAdd, submitAttendance, transitionSession, validatePasscode } from '@/lib/edgeFunctions';
+import { bulkMarkAll, correctRecord, manualAdd, submitAttendance, transitionSession, validatePasscode } from '@/lib/edgeFunctions';
 
 type StubResponse = { status: number; body: unknown };
 
@@ -343,6 +343,39 @@ describe('manual-attendance client', () => {
     const result = await manualAdd('s1', 'FUT/2022/009', 'No phone');
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe('session_read_only');
+  });
+
+  it('sends a bulk mark-all with the shared reason, and returns the counts', async () => {
+    stubFetch({
+      status: 200,
+      body: { ok: true, marked: 40, skipped: 2, failed: 0, failedNumbers: [] },
+    });
+    const result = await bulkMarkAll('s1', 'Marked all as arrived by lecturer');
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.marked).toBe(40);
+      expect(result.data.skipped).toBe(2);
+      expect(result.data.failed).toBe(0);
+    }
+    expect(fetchCalls[0].url).toBe('https://test.supabase.co/functions/v1/manual-attendance');
+    expect(JSON.parse(String(fetchCalls[0].init.body))).toEqual({
+      sessionId: 's1',
+      bulkMarkAll: true,
+      reason: 'Marked all as arrived by lecturer',
+    });
+  });
+
+  it('maps an empty-class-list refusal (409) to its server code', async () => {
+    stubFetch({
+      status: 409,
+      body: {
+        ok: false,
+        error: { code: 'empty_class_list', message: 'This course has no class list yet.' },
+      },
+    });
+    const result = await bulkMarkAll('s1', 'Marked all as arrived by lecturer');
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe('empty_class_list');
   });
 });
 

@@ -3,7 +3,8 @@
 // POST { sessionId, registrationNumber, reason }                       -> manual add
 // POST { sessionId, recordId, newStatus, reason }                     -> correction
 // POST { sessionId, recordId, faceReview: 'confirm' | 'dismiss', reason } -> face review (v0.10.0)
-// Exactly one of the three shapes is accepted per call.
+// POST { sessionId, bulkMarkAll: true, reason }                      -> mark all as arrived (v0.12.0)
+// Exactly one of the four shapes is accepted per call.
 // Requires the lecturer's Supabase Auth JWT; the caller must own the
 // session. Finalized / archived sessions are read-only: all shapes
 // are refused with 409 session_read_only.
@@ -24,11 +25,21 @@
 //     'dismiss' means the lecturer checked and it is fine — the
 //     status stays as it was. A record that is not flagged is
 //     refused (409 face_review_not_flagged). See faceReview.ts.
-//   - Every manual entry, correction and face review writes an
-//     attendance_audit_logs row (action 'manual_attendance',
-//     'correction', 'face_review_confirmed' or
-//     'face_review_dismissed', previous/new status, reason,
-//     lecturer, timestamp).
+//   - Bulk mark all as arrived (v0.12.0): marks every student on
+//     the course's class list as manual attendance, skipping any
+//     registration number that already has a record in this
+//     session — nobody is ever counted twice, and a second run
+//     marks nobody new. The class list is re-read server-side;
+//     the client never decides who gets marked. One shared reason
+//     is stored on every new record and in the audit log (one
+//     audit row per marked record, action
+//     'bulk_manual_attendance'). A course with no class list is
+//     refused (409 empty_class_list). See bulkMark.ts.
+//   - Every manual entry, correction, face review and bulk mark
+//     writes an attendance_audit_logs row (action
+//     'manual_attendance', 'correction', 'face_review_confirmed',
+//     'face_review_dismissed' or 'bulk_manual_attendance',
+//     previous/new status, reason, lecturer, timestamp).
 //
 // UNTESTED: this function has not been run against a live Supabase
 // project. Deploy to staging first and exercise manual add,
@@ -47,6 +58,12 @@ import {
   applyFaceReviewDecision,
   parseFaceReviewDecision,
 } from './faceReview.ts';
+import {
+  buildBulkMarkAuditRows,
+  buildBulkMarkRecords,
+  computeBulkMarkTargets,
+  summarizeBulkMarkRun,
+} from './bulkMark.ts';
 
 const RECORD_STATUSES = ['verified', 'manual', 'pending', 'rejected', 'suspicious'] as const;
 type RecordStatus = (typeof RECORD_STATUSES)[number];
@@ -58,6 +75,8 @@ type ManualBody = {
   newStatus?: unknown;
   /** Face review decision (v0.10.0): 'confirm' | 'dismiss'. */
   faceReview?: unknown;
+  /** Bulk mark all as arrived (v0.12.0): true for the bulk shape. */
+  bulkMarkAll?: unknown;
   reason?: unknown;
 };
 
@@ -84,16 +103,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const recordId = typeof body.recordId === 'string' ? body.recordId.trim() : '';
   const newStatus = typeof body.newStatus === 'string' ? body.newStatus.trim() : '';
   const faceReviewRaw = typeof body.faceReview === 'string' ? body.faceReview.trim() : '';
+  const isBulkMark = body.bulkMarkAll === true;
 
   if (!sessionId) return errorResponse('invalid_request', 'sessionId is required.', 400);
   if (!reason) return errorResponse('invalid_request', 'A reason is required for every manual entry and correction.', 400);
   const isAdd = Boolean(registrationNumber);
   const isCorrection = Boolean(recordId) && Boolean(newStatus);
   const isFaceReview = Boolean(recordId) && faceReviewRaw.length > 0;
-  if ([isAdd, isCorrection, isFaceReview].filter(Boolean).length !== 1) {
+  if ([isAdd, isCorrection, isFaceReview, isBulkMark].filter(Boolean).length !== 1) {
     return errorResponse(
       'invalid_request',
-      'Send either registrationNumber (manual add), recordId + newStatus (correction), or recordId + faceReview (face review), not more than one.',
+      'Send either registrationNumber (manual add), recordId + newStatus (correction), recordId + faceReview (face review), or bulkMarkAll (mark all as arrived), not more than one.',
       400,
     );
   }
@@ -119,7 +139,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   const { data: session, error: sessionError } = await supabase
     .from('attendance_sessions')
-    .select('id, lecturer_id, status')
+    .select('id, lecturer_id, course_id, status')
     .eq('id', sessionId)
     .maybeSingle();
   if (sessionError) return errorResponse('server_error', sessionError.message, 500);
@@ -184,6 +204,136 @@ Deno.serve(async (req: Request): Promise<Response> => {
       });
     }
     return jsonResponse({ ok: true, record });
+  }
+
+  // Bulk mark all as arrived (v0.12.0): one tap marks every
+  // student on the course's class list as manual attendance. The
+  // list and the session's records are re-read server-side — the
+  // client never decides who gets marked. Anyone who already has
+  // a record (verified or manual) is skipped, so nobody is ever
+  // counted twice and a second run marks nobody new. A course
+  // with no class list has nobody to mark, so it is refused.
+  if (isBulkMark) {
+    const { data: rosterRows, error: rosterError } = await supabase
+      .from('course_students')
+      .select('reg_number')
+      .eq('course_id', session.course_id);
+    if (rosterError) return errorResponse('server_error', rosterError.message, 500);
+    const roster = (rosterRows ?? []).map((row) => row.reg_number as string);
+    if (roster.length === 0) {
+      return errorResponse(
+        'empty_class_list',
+        'This course has no class list yet. Add students to the class list first.',
+        409,
+      );
+    }
+    const { data: existingRows, error: existingError } = await supabase
+      .from('attendance_records')
+      .select('registration_number')
+      .eq('session_id', sessionId);
+    if (existingError) return errorResponse('server_error', existingError.message, 500);
+    const targets = computeBulkMarkTargets(
+      roster,
+      (existingRows ?? []).map((row) => row.registration_number as string),
+    );
+    if (targets.toMark.length === 0) {
+      return jsonResponse({
+        ok: true,
+        marked: 0,
+        skipped: targets.skipped.length,
+        failed: 0,
+        failedNumbers: [],
+      });
+    }
+    const rows = buildBulkMarkRecords(sessionId, targets.toMark, reason);
+    const { data: inserted, error: insertError } = await supabase
+      .from('attendance_records')
+      .insert(rows)
+      .select('id, registration_number');
+    let markedRecords: Array<{ id: string; registration_number: string }>;
+    let failedNumbers: string[] = [];
+    if (!insertError && inserted) {
+      markedRecords = inserted as Array<{ id: string; registration_number: string }>;
+    } else if ((insertError as { code?: string }).code === '23505') {
+      // A race: a student submitted between the read and the
+      // insert. Retry the remaining numbers one by one — a
+      // duplicate is just a skip, a real error is a failure.
+      markedRecords = [];
+      const outcomes: Array<'marked' | 'skipped' | 'failed'> = [];
+      const raceFailedNumbers: string[] = [];
+      for (const row of rows) {
+        const { data: one, error: oneError } = await supabase
+          .from('attendance_records')
+          .insert(row)
+          .select('id, registration_number')
+          .single();
+        if (!oneError && one) {
+          outcomes.push('marked');
+          markedRecords.push(one as { id: string; registration_number: string });
+        } else if ((oneError as { code?: string }).code === '23505') {
+          outcomes.push('skipped');
+        } else {
+          outcomes.push('failed');
+          raceFailedNumbers.push(row.registration_number);
+        }
+      }
+      const outcome = summarizeBulkMarkRun(outcomes, raceFailedNumbers);
+      const totalSkipped = targets.skipped.length + outcome.skipped;
+      failedNumbers = outcome.failedNumbers;
+      if (outcome.marked === 0 && outcome.failed === 0) {
+        // Everything was already submitted mid-run — nothing new
+        // to mark, and nothing failed.
+        return jsonResponse({
+          ok: true,
+          marked: 0,
+          skipped: totalSkipped,
+          failed: 0,
+          failedNumbers: [],
+        });
+      }
+      if (outcome.failed > 0 && outcome.marked === 0) {
+        // Nothing could be marked at all — a plain failure, not a
+        // half-result dressed as success.
+        return errorResponse(
+          'server_error',
+          `Could not mark any students as arrived (${outcome.failed} failed). Try again.`,
+          500,
+        );
+      }
+      const auditRows = buildBulkMarkAuditRows(sessionId, markedRecords, lecturerId, reason);
+      const { error: auditError } = await supabase
+        .from('attendance_audit_logs')
+        .insert(auditRows);
+      return jsonResponse({
+        ok: true,
+        marked: outcome.marked,
+        skipped: totalSkipped,
+        failed: outcome.failed,
+        failedNumbers,
+        warning: auditError
+          ? `Marked ${outcome.marked} students as arrived, but the audit log entries could not be written: ${auditError.message}`
+          : undefined,
+      });
+    } else {
+      // The single bulk insert failed outright — the statement is
+      // atomic, so nothing was marked. Report it as a failure,
+      // never as a partial success.
+      return errorResponse('server_error', insertError?.message ?? 'Could not mark students as arrived.', 500);
+    }
+    const auditRows = buildBulkMarkAuditRows(sessionId, markedRecords, lecturerId, reason);
+    const { error: auditError } = await supabase
+      .from('attendance_audit_logs')
+      .insert(auditRows);
+    return jsonResponse({
+      ok: true,
+      marked: markedRecords.length,
+      skipped: targets.skipped.length,
+      failed: 0,
+      failedNumbers: [],
+      warning: auditError
+        ? `Marked ${markedRecords.length} students as arrived, but the audit log entries could not be written: ${auditError.message}`
+        : undefined,
+    });
   }
 
   if (isAdd) {

@@ -11,6 +11,7 @@ import {
   validateManualAttendance,
 } from '@/lib/submission';
 import { correctRecord, manualAdd, reviewFace, transitionSession } from '@/lib/edgeFunctions';
+import { BulkMarkAll } from './BulkMarkAll';
 import { QrDisplay } from './QrDisplay';
 import { LocationAllowPanel, LocationBlockedPanel } from '@/components/ui/location-permission';
 import { StatusBadge } from '@/components/ui/badge';
@@ -697,6 +698,10 @@ export function SessionMonitor({
               {manualBusy ? 'Adding…' : 'Add manually'}
             </Button>
           </form>
+          <div className="mt-8">
+            <h4 className="mb-4 text-[15px] font-medium text-ink">Mark all as arrived</h4>
+            <BulkMarkAll session={session} records={records} onMarked={() => void loadRecords()} />
+          </div>
         </section>
       ) : null}
 

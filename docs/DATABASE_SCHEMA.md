@@ -256,7 +256,7 @@ Immutable audit events. No update/delete path is provided in the app.
 | session_id | uuid FK → attendance_sessions, nullable | |
 | record_id | uuid FK → attendance_records, nullable | |
 | lecturer_id | uuid FK → lecturer_profiles, nullable | |
-| action | text, not null | e.g. `manual_attendance`, `correction`, `finalize` |
+| action | text, not null | e.g. `manual_attendance`, `bulk_manual_attendance`, `correction`, `finalize` |
 | previous_status | text | |
 | new_status | text | |
 | reason | text | |
