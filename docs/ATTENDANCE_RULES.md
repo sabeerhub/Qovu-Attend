@@ -78,6 +78,22 @@ number only.
   is display-only; the server decides. Sessions activated before
   v0.5.0 have no anchor and refuse submissions until closed and
   reopened.
+- **Patient GPS wait, no rough fallback (v0.10.1).** Phone GPS
+  works without mobile data — it listens to satellites, not the
+  internet — but a cold fix without data takes 60–120 seconds, so
+  the app waits up to 2 minutes for a good fix and shows it is
+  still trying ("Waiting for your location… 25s — this can take a
+  minute without mobile data. Stay near a window."). A fix worse
+  than 100 m is never accepted: there is no network fallback,
+  because a rough fix would only be refused anyway. The accuracy
+  is checked right after capture, BEFORE the selfie — tapping
+  Allow only gives permission, it does not mean the fix is good,
+  so a rough fix warns immediately instead of wasting the selfie.
+  If no good fix arrives in 2 minutes, the student sees the
+  couldn't-lock screen ("Try again", or go to the lecturer, who
+  adds them by hand) — never a dead end. A denied permission
+  still fails fast with re-allow instructions. The same patient
+  wait applies to the lecturer's activation anchor.
 - **Device binding.** Each submission carries the SHA-256 hash of a
   device fingerprint (screen, user agent, timezone, hardware,
   canvas — only the hash ever leaves the phone). The first

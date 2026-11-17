@@ -97,6 +97,10 @@ export function SessionMonitor({
     permission: LocationPermissionState;
   }>(null);
   const [locating, setLocating] = useState(false);
+  // Seconds spent waiting for a GPS fix (v0.10.1): the patient
+  // capture can take up to 2 minutes without mobile data, and the
+  // allow panel shows the wait live so it never looks stuck.
+  const [locatingElapsed, setLocatingElapsed] = useState<number | null>(null);
 
   const [manualRegNo, setManualRegNo] = useState('');
   const [manualReason, setManualReason] = useState('');
@@ -189,8 +193,13 @@ export function SessionMonitor({
 
   async function locateAndActivate(to: SessionStatus, confirmedHeadcount: number | undefined) {
     setLocating(true);
-    const location = await requestDeviceLocation();
+    setLocatingElapsed(null);
+    // Patient capture (v0.10.1): up to 2 minutes for a good GPS fix
+    // — the lecturer may also be indoors without data. Activation
+    // still cannot proceed without a usable fix.
+    const location = await requestDeviceLocation((elapsed) => setLocatingElapsed(elapsed));
     setLocating(false);
+    setLocatingElapsed(null);
     setLocationGate(null);
     if (!location.ok || !location.coords) {
       setNotice({
@@ -728,6 +737,7 @@ export function SessionMonitor({
               ) : (
                 <LocationAllowPanel
                   locating={locating}
+                  elapsedSeconds={locatingElapsed ?? undefined}
                   onAllow={() => {
                     const parsed = parseHeadcountInput(headcountInput);
                     if (!parsed.ok) {

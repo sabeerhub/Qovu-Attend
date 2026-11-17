@@ -3,6 +3,7 @@ import {
   DEFAULT_LOCATION_RADIUS_METERS,
   checkLocation,
   haversineMeters,
+  isUsableLocationFix,
   locationErrorMessage,
   nextLocationStep,
   queryLocationPermission,
@@ -126,22 +127,25 @@ describe('requestDeviceLocation', () => {
     expect(calls[0]).toEqual({ enableHighAccuracy: true, timeout: 30_000, maximumAge: 0 });
   });
 
-  it('falls back to a network fix when the high-accuracy attempt times out', async () => {
+  it('retries with high accuracy when the first attempts time out — a good fix arriving late (70 s) is accepted', async () => {
     const { calls } = mockGeolocation([
       { kind: 'error', code: 3 },
-      { kind: 'success', latitude: 11.7594, longitude: 9.3392, accuracy: 45 },
+      { kind: 'error', code: 3 },
+      { kind: 'success', latitude: 11.7594, longitude: 9.3392, accuracy: 12 },
     ]);
     const result = await requestDeviceLocation();
     expect(result).toEqual({
       ok: true,
-      coords: { latitude: 11.7594, longitude: 9.3392, accuracy: 45 },
+      coords: { latitude: 11.7594, longitude: 9.3392, accuracy: 12 },
       error: null,
     });
-    expect(calls).toHaveLength(2);
-    expect(calls[1]).toEqual({ enableHighAccuracy: false, timeout: 15_000, maximumAge: 30_000 });
+    expect(calls).toHaveLength(3);
+    for (const call of calls) {
+      expect(call).toEqual({ enableHighAccuracy: true, timeout: 30_000, maximumAge: 0 });
+    }
   });
 
-  it('falls back to a network fix when the high-accuracy attempt is unavailable', async () => {
+  it('retries with high accuracy when an attempt is unavailable', async () => {
     const { calls } = mockGeolocation([
       { kind: 'error', code: 2 },
       { kind: 'success', latitude: 11.7594, longitude: 9.3392, accuracy: 60 },
@@ -152,6 +156,47 @@ describe('requestDeviceLocation', () => {
     expect(calls).toHaveLength(2);
   });
 
+  it('discards a rough fix (worse than 100 m) and keeps waiting for a good one — never a network fallback', async () => {
+    const { calls } = mockGeolocation([
+      { kind: 'success', latitude: 11.7594, longitude: 9.3392, accuracy: 800 },
+      { kind: 'success', latitude: 11.7594, longitude: 9.3392, accuracy: 12 },
+    ]);
+    const result = await requestDeviceLocation();
+    expect(result).toEqual({
+      ok: true,
+      coords: { latitude: 11.7594, longitude: 9.3392, accuracy: 12 },
+      error: null,
+    });
+    expect(calls).toHaveLength(2);
+    for (const call of calls) {
+      expect(call.enableHighAccuracy).toBe(true);
+    }
+  });
+
+  it('times out after the attempts are spent when only rough fixes arrive', async () => {
+    const { calls } = mockGeolocation([
+      { kind: 'success', latitude: 11.7594, longitude: 9.3392, accuracy: 800 },
+      { kind: 'success', latitude: 11.7594, longitude: 9.3392, accuracy: 500 },
+      { kind: 'success', latitude: 11.7594, longitude: 9.3392, accuracy: 650 },
+      { kind: 'success', latitude: 11.7594, longitude: 9.3392, accuracy: 400 },
+    ]);
+    const result = await requestDeviceLocation();
+    expect(result).toEqual({ ok: false, coords: null, error: 'timeout' });
+    expect(calls).toHaveLength(4);
+  });
+
+  it('times out after the attempts are spent when every attempt errors', async () => {
+    const { calls } = mockGeolocation([
+      { kind: 'error', code: 3 },
+      { kind: 'error', code: 2 },
+      { kind: 'error', code: 3 },
+      { kind: 'error', code: 2 },
+    ]);
+    const result = await requestDeviceLocation();
+    expect(result).toEqual({ ok: false, coords: null, error: 'timeout' });
+    expect(calls).toHaveLength(4);
+  });
+
   it('fails fast on a denial — no retry after the browser says no', async () => {
     const { calls, getCurrentPosition } = mockGeolocation([{ kind: 'error', code: 1 }]);
     const result = await requestDeviceLocation();
@@ -160,14 +205,46 @@ describe('requestDeviceLocation', () => {
     expect(calls).toHaveLength(1);
   });
 
-  it('returns the second attempt’s error when both stages fail', async () => {
-    const { calls } = mockGeolocation([
-      { kind: 'error', code: 3 },
-      { kind: 'error', code: 2 },
-    ]);
-    const result = await requestDeviceLocation();
-    expect(result).toEqual({ ok: false, coords: null, error: 'unavailable' });
-    expect(calls).toHaveLength(2);
+  it('reports elapsed seconds while waiting, and stops ticking after a fix', async () => {
+    vi.useFakeTimers();
+    try {
+      const pending: Array<{ success: PositionCallback; error: PositionErrorCallback }> = [];
+      const getCurrentPosition = vi.fn(
+        (success: PositionCallback, error?: PositionErrorCallback | null) => {
+          pending.push({ success, error: error as PositionErrorCallback });
+        },
+      );
+      vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
+      const onProgress = vi.fn();
+      const promise = requestDeviceLocation(onProgress);
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(onProgress).toHaveBeenCalledWith(1);
+      expect(onProgress).toHaveBeenCalledWith(2);
+      expect(onProgress).toHaveBeenCalledWith(3);
+      pending[0].success({
+        coords: {
+          latitude: 11.7594,
+          longitude: 9.3392,
+          accuracy: 12,
+          altitude: null,
+          altitudeAccuracy: null,
+          heading: null,
+          speed: null,
+        },
+        timestamp: Date.now(),
+      } as GeolocationPosition);
+      await expect(promise).resolves.toEqual({
+        ok: true,
+        coords: { latitude: 11.7594, longitude: 9.3392, accuracy: 12 },
+        error: null,
+      });
+      onProgress.mockClear();
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(onProgress).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
   });
 });
 
@@ -207,6 +284,22 @@ describe('nextLocationStep (permission branching)', () => {
 
   it('goes straight to the capture with no Permissions API', () => {
     expect(nextLocationStep('unknown')).toBe('request');
+  });
+});
+
+describe('isUsableLocationFix (v0.10.1: rough fixes are never accepted)', () => {
+  it('accepts accuracy of 100 m or better', () => {
+    expect(isUsableLocationFix({ ...DUTSE_HALL, accuracy: 12 })).toBe(true);
+    expect(isUsableLocationFix({ ...DUTSE_HALL, accuracy: 100 })).toBe(true);
+  });
+
+  it('rejects accuracy worse than 100 m', () => {
+    expect(isUsableLocationFix({ ...DUTSE_HALL, accuracy: 101 })).toBe(false);
+    expect(isUsableLocationFix({ ...DUTSE_HALL, accuracy: 800 })).toBe(false);
+  });
+
+  it('accepts an unreported accuracy, exactly as the server rule does', () => {
+    expect(isUsableLocationFix({ ...DUTSE_HALL, accuracy: null })).toBe(true);
   });
 });
 

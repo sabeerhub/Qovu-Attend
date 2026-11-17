@@ -110,6 +110,11 @@ nothing. Do not treat them as verified until that test has run.
     falsely reject an honest student at the back of the hall; that is
     why a reported accuracy worse than 100 m is refused outright
     rather than trusted.
+  - GPS works without mobile data, but a cold fix is slow (60–120 s).
+    The app waits up to 2 minutes for a fix of 100 m accuracy or
+    better and never accepts a rough network fix (v0.10.1). If GPS
+    cannot lock, the student goes to the lecturer for a manual add —
+    the check fails closed, never silently.
   - A fingerprint is a hashed deterrent, not a proof of identity. A
     second phone, a wiped browser, or a spoofed fingerprint defeats
     device binding. It catches the common case (one phone submitting

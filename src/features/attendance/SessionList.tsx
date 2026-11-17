@@ -38,6 +38,10 @@ export function SessionList({
     permission: LocationPermissionState;
   }>(null);
   const [locating, setLocating] = useState(false);
+  // Seconds spent waiting for a GPS fix (v0.10.1): the patient
+  // capture can take up to 2 minutes without mobile data, and the
+  // allow panel shows the wait live so it never looks stuck.
+  const [locatingElapsed, setLocatingElapsed] = useState<number | null>(null);
 
   useEffect(() => {
     if (!supabase) return;
@@ -87,8 +91,13 @@ export function SessionList({
 
   async function locateAndActivate(session: SessionRow) {
     setLocating(true);
-    const location = await requestDeviceLocation();
+    setLocatingElapsed(null);
+    // Patient capture (v0.10.1): up to 2 minutes for a good GPS fix
+    // — the lecturer may also be indoors without data. Activation
+    // still cannot proceed without a usable fix.
+    const location = await requestDeviceLocation((elapsed) => setLocatingElapsed(elapsed));
     setLocating(false);
+    setLocatingElapsed(null);
     setLocationGate(null);
     if (!location.ok || !location.coords) {
       setActionError(
@@ -137,6 +146,7 @@ export function SessionList({
           ) : (
             <LocationAllowPanel
               locating={locating}
+              elapsedSeconds={locatingElapsed ?? undefined}
               onAllow={() => void locateAndActivate(locationGate.session)}
             />
           )}

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { buildIdempotencyKey, isValidRegistrationNumber, newIdempotencyKey, normalizeRegistrationNumber } from '@/lib/submission';
 import { getSubmitParams, submitAttendance } from '@/lib/edgeFunctions';
-import { locationErrorMessage, nextLocationStep, queryLocationPermission, requestDeviceLocation } from '@/lib/geo';
+import { isUsableLocationFix, locationErrorMessage, nextLocationStep, queryLocationPermission, requestDeviceLocation } from '@/lib/geo';
 import { LocationAllowPanel, LocationBlockedPanel } from '@/components/ui/location-permission';
 import {
   getDeviceFingerprint,
@@ -42,6 +42,14 @@ import type { CapturedSelfie } from '@/lib/selfieCapture';
  * there is no way to submit without one. A missing or denied
  * camera stops the form with a plain message, and the student
  * goes to the lecturer, who adds them by hand.
+ *
+ * Order (v0.10.1, owner-caught): the location's accuracy is
+ * checked right after capture, BEFORE the selfie. Tapping Allow
+ * only gives permission — it does not mean the fix is good. A
+ * rough fix warns immediately (try again with the patient wait,
+ * or go to the lecturer); the student never does the selfie first
+ * and gets rejected for location afterwards. The server still
+ * re-checks everything at submit (defence in depth).
  */
 export function SubmitAttendance(props?: { passcode?: string }) {
   const urlParams = typeof window !== 'undefined' ? getSubmitParams(window.location.search) : null;
@@ -60,9 +68,10 @@ export function SubmitAttendance(props?: { passcode?: string }) {
     | { status: 'success'; registrationNumber: string; duplicate: boolean; retried: boolean }
     | { status: 'error'; code: string; message: string }
   >({ status: 'form' });
-  // Location + device are checked BEFORE the selfie step, so the
-  // photo is only taken once the submission is otherwise ready
-  // to go. Held here until the student takes the photo.
+  // Location (capture + accuracy) and device are checked BEFORE
+  // the selfie step, so the photo is only taken once the submission
+  // is otherwise ready to go. Held here until the student takes
+  // the photo.
   const [pendingSubmit, setPendingSubmit] = useState<null | {
     registrationNumber: string;
     passcode: string;
@@ -175,15 +184,49 @@ export function SubmitAttendance(props?: { passcode?: string }) {
     setLocationGate(null);
     setState({ status: 'submitting' });
     // Location is mandatory: no coordinates, no attendance. The
-    // student must allow location for this site.
-    setProgress('Checking your location…');
-    const location = await requestDeviceLocation();
+    // student must allow location for this site. The capture waits
+    // patiently for a good GPS fix (v0.10.1, up to 2 minutes — a
+    // cold fix without mobile data is slow), and the progress text
+    // shows it is still trying, so the wait never looks stuck.
+    setProgress('Waiting for your location…');
+    const location = await requestDeviceLocation((elapsed) =>
+      setProgress(
+        `Waiting for your location… ${elapsed}s — this can take a minute without mobile data. Stay near a window.`,
+      ),
+    );
     if (!location.ok || !location.coords) {
       setProgress(null);
+      if (location.error === 'timeout') {
+        // Patient wait over (v0.10.1): no good GPS fix in 2 minutes.
+        // Never a dead end — retry, or go to the lecturer, who adds
+        // the student by hand (the hint is rendered with the error).
+        setState({
+          status: 'error',
+          code: 'location_timeout',
+          message: locationErrorMessage('timeout'),
+        });
+        return;
+      }
       setState({
         status: 'error',
         code: 'location_required',
         message: locationErrorMessage(location.error ?? 'unavailable'),
+      });
+      return;
+    }
+    // Accuracy is checked RIGHT HERE (v0.10.1), before the selfie:
+    // tapping Allow only gives permission, it does not mean the fix
+    // is good. A rough fix never advances to the photo step — the
+    // student sees the location warning now, not after the selfie.
+    // The capture above already discards rough fixes while it waits,
+    // so this is the safety net for any fix that still arrives rough.
+    if (!isUsableLocationFix(location.coords)) {
+      setProgress(null);
+      setState({
+        status: 'error',
+        code: 'location_too_imprecise',
+        message:
+          'Your location is too imprecise to verify. Move near a window or outside for a clearer GPS signal and try again.',
       });
       return;
     }
@@ -293,6 +336,11 @@ export function SubmitAttendance(props?: { passcode?: string }) {
       ) : state.status === 'error' ? (
         <div className="mt-6">
           <ErrorState
+            hint={
+              state.code === 'location_timeout' || state.code === 'location_too_imprecise'
+                ? 'No GPS signal? Go to your lecturer — they will add you by hand.'
+                : undefined
+            }
             message={
               state.code === 'token_expired'
                 ? 'The QR code for this session has expired. Ask your lecturer for a new code.'
@@ -307,7 +355,7 @@ export function SubmitAttendance(props?: { passcode?: string }) {
                         : state.code === 'location_not_configured'
                           ? 'This session was started before location checks. Ask your lecturer to close and reopen it.'
                           : state.code === 'location_too_imprecise'
-                            ? 'Your location is too imprecise to verify. Move somewhere with a clearer GPS signal and try again.'
+                            ? 'Your location is too imprecise to verify. Move near a window or outside for a clearer GPS signal and try again.'
                             : state.code === 'outside_location'
                               ? 'You are too far from the lecture hall to submit attendance for this session.'
                               : state.code === 'device_bound_to_another_student'

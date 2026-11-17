@@ -116,32 +116,51 @@ export function checkLocation(
 }
 
 /**
- * Two-stage device location via the Geolocation API (v0.5.1).
+ * Patient device location via the Geolocation API (v0.10.1).
  *
- * A high-accuracy GPS fix indoors routinely takes longer than a few
- * seconds or fails outright, so a single short high-accuracy attempt
- * refused activations even with location services on. Stage 1 tries
- * high accuracy for 30 s; only a timeout or an unavailable position
- * falls through to stage 2, a network-based fix for 15 s (cached
- * fixes up to 30 s old are accepted). A denied permission fails fast
- * — the browser will not re-prompt — and 'unsupported' is final too.
- * The first usable fix is returned.
+ * A cold GPS fix without mobile data takes 60–120 s (the phone
+ * must hear the satellites directly, with no data to speed it up),
+ * so a short capture timed out before a good fix arrived — and the
+ * old network fallback only ever returned a rough fix that the
+ * 100 m accuracy rule rejects anyway. This capture therefore waits
+ * patiently for a GOOD fix: repeated high-accuracy attempts for up
+ * to 120 s in total (4 attempts of at most 30 s each). A fix whose
+ * reported accuracy is worse than 100 m is discarded, never
+ * returned — it could only be refused downstream. A denied
+ * permission fails fast — the browser will not re-prompt — and
+ * 'unsupported' is final too. When nothing good arrives in time
+ * the result is a 'timeout' (the caller shows the couldn't-lock
+ * screen: try again, or go to the lecturer for a manual add).
+ *
+ * `onProgress` is called about once a second with the elapsed
+ * seconds, so the UI can show it is still trying (a student
+ * waiting on a slow GPS fix must not think the app is stuck).
  *
  * Nothing here runs at import time: `navigator.geolocation` is read
  * only when this is called, so server-side rendering and tests stay
- * safe. The anchor accepts any accuracy (it is stored and shown);
- * the 100 m cap stays a student-submission rule only.
+ * safe. The same usable-fix rule applies to the lecturer's anchor:
+ * a rough anchor would make the 30 m check meaningless, so
+ * activation waits for a good fix too. The server still re-checks
+ * everything at submit (defence in depth).
  */
-const STAGE_ONE_OPTIONS: PositionOptions = {
+export const LOCATION_CAPTURE_TIMEOUT_MS = 120_000;
+const LOCATION_CAPTURE_ATTEMPT_TIMEOUT_MS = 30_000;
+const LOCATION_CAPTURE_MAX_ATTEMPTS = 4;
+
+const CAPTURE_OPTIONS = (
+  timeoutMs: number,
+): PositionOptions => ({
   enableHighAccuracy: true,
-  timeout: 30_000,
+  timeout: timeoutMs,
   maximumAge: 0,
-};
-const STAGE_TWO_OPTIONS: PositionOptions = {
-  enableHighAccuracy: false,
-  timeout: 15_000,
-  maximumAge: 30_000,
-};
+});
+
+/** A fix is usable only when its reported accuracy is trusted:
+ *  100 m or better. An unreported accuracy (null) passes, exactly
+ *  as the server rule treats it. */
+export function isUsableLocationFix(coords: GeoCoords): boolean {
+  return coords.accuracy === null || coords.accuracy <= MAX_LOCATION_ACCURACY_METERS;
+}
 
 function requestOnce(options: PositionOptions): Promise<LocationResult> {
   const nav = globalThis.navigator as Navigator | undefined;
@@ -180,14 +199,45 @@ function requestOnce(options: PositionOptions): Promise<LocationResult> {
   });
 }
 
-export async function requestDeviceLocation(): Promise<LocationResult> {
-  const first = await requestOnce(STAGE_ONE_OPTIONS);
-  if (first.ok) return first;
-  // A denial is final, and 'unsupported' is final too — retrying
-  // would only waste the user's time.
-  if (first.error === 'denied' || first.error === 'unsupported') return first;
-  // Timeout or unavailable: a network-based fix may still work.
-  return requestOnce(STAGE_TWO_OPTIONS);
+export async function requestDeviceLocation(
+  onProgress?: (elapsedSeconds: number) => void,
+): Promise<LocationResult> {
+  const startedAt = Date.now();
+  const deadline = startedAt + LOCATION_CAPTURE_TIMEOUT_MS;
+  const elapsedSeconds = (): number =>
+    Math.floor((Date.now() - startedAt) / 1000);
+  // Live "still trying" ticks while an attempt is pending — without
+  // these, a 30 s attempt looks stuck to the student.
+  const ticker =
+    onProgress === undefined
+      ? undefined
+      : setInterval(() => onProgress(elapsedSeconds()), 1000);
+  try {
+    for (let attempt = 0; attempt < LOCATION_CAPTURE_MAX_ATTEMPTS; attempt++) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) break;
+      const result = await requestOnce(
+        CAPTURE_OPTIONS(
+          Math.min(LOCATION_CAPTURE_ATTEMPT_TIMEOUT_MS, remaining),
+        ),
+      );
+      if (result.ok && result.coords && isUsableLocationFix(result.coords)) {
+        return result;
+      }
+      // A denial is final, and 'unsupported' is final too — retrying
+      // would only waste the user's time.
+      if (result.error === 'denied' || result.error === 'unsupported') {
+        return result;
+      }
+      // A rough fix (worse than 100 m), a timeout, or an unavailable
+      // position: discard it and keep waiting for a good GPS fix
+      // while time remains. The next attempt reuses the warming GPS.
+      onProgress?.(elapsedSeconds());
+    }
+    return { ok: false, coords: null, error: 'timeout' };
+  } finally {
+    if (ticker !== undefined) clearInterval(ticker);
+  }
 }
 
 /** Plain-language message for a failed location request. */
@@ -196,7 +246,7 @@ export function locationErrorMessage(error: LocationErrorCode): string {
     case 'denied':
       return 'Location permission was denied. Turn on location for this site in your browser settings and try again.';
     case 'timeout':
-      return 'Your location could not be found in time. Move somewhere with a clearer GPS signal and try again.';
+      return 'Your location could not be locked in 2 minutes. Move somewhere with a clearer view of the sky — near a window or outside — and try again.';
     case 'unsupported':
       return 'This device or browser cannot provide a location. Attendance needs a device with location services.';
     case 'unavailable':

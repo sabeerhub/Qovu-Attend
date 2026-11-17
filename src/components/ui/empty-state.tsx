@@ -30,11 +30,22 @@ export function LoadingState({ label = 'Loading…' }: { label?: string }) {
   );
 }
 
-export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+export function ErrorState({
+  message,
+  onRetry,
+  hint,
+}: {
+  message: string;
+  onRetry?: () => void;
+  /** Plain second line under the message (v0.10.1): e.g. the
+   *  manual-add fallback when GPS could not lock. */
+  hint?: string;
+}) {
   return (
     <div className="flex flex-col items-start gap-2 rounded-xl border border-line bg-surface px-6 py-10">
       <p className="text-[15px] font-medium text-ink">Something went wrong</p>
       <p className="text-[13px] text-muted">{message}</p>
+      {hint ? <p className="text-[13px] text-muted">{hint}</p> : null}
       {onRetry ? (
         <Button variant="secondary" className="mt-2" onClick={onRetry}>
           Try again

@@ -41,9 +41,13 @@ export function LocationBlockedPanel({ onRetry }: { onRetry: () => void }) {
 export function LocationAllowPanel({
   onAllow,
   locating,
+  elapsedSeconds,
 }: {
   onAllow: () => void;
   locating: boolean;
+  /** Seconds spent waiting for a GPS fix so far (v0.10.1): shown
+   *  while the patient capture runs, so the wait never looks stuck. */
+  elapsedSeconds?: number;
 }) {
   return (
     <div className="rounded-xl border border-line bg-surface p-4 shadow-card">
@@ -52,6 +56,12 @@ export function LocationAllowPanel({
         Qovu needs your location for this step. Tap the button and allow location when
         your browser asks.
       </p>
+      {locating && elapsedSeconds !== undefined ? (
+        <p className="mt-2 text-[13px] text-muted" role="status">
+          Waiting for your location… {elapsedSeconds}s — this can take a minute without
+          mobile data. Stay near a window.
+        </p>
+      ) : null}
       <Button className="mt-3" disabled={locating} onClick={onAllow}>
         {locating ? 'Finding your location…' : 'Allow location to continue'}
       </Button>
