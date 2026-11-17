@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 64" width="320" height="128" role="img" aria-label="Qovu">
+  <title>Qovu</title>
+  <style>
+    .q-ink { stroke: #111111; }
+    .q-text { fill: #111111; }
+    @media (prefers-color-scheme: dark) {
+      .q-ink { stroke: #ffffff; }
+      .q-text { fill: #ffffff; }
+    }
+  </style>
+  <!-- Animated Qovu lockup: the same Q mark and wordmark as logo.svg,
+       our colors only (ink #111111, one accent #0071e3), no gradients.
+       SMIL animation: the Q circle draws in, the tail follows, the
+       blue dot pops in, the wordmark fades in, then the dot breathes
+       slowly. Apple-quiet — no spinning, no bouncing.
+       Every element's base attribute is its FINAL state, so the logo
+       is correct even where SMIL is ignored. -->
+  <circle class="q-ink" cx="30" cy="28" r="19" fill="none" stroke-width="6" stroke-dasharray="119.38" stroke-dashoffset="0">
+    <animate attributeName="stroke-dashoffset" from="119.38" to="0" dur="1.2s" begin="0s" fill="freeze"/>
+  </circle>
+  <line class="q-ink" x1="43" y1="41" x2="53" y2="53" stroke-width="6" stroke-linecap="round" stroke-dasharray="15.62" stroke-dashoffset="0">
+    <animate attributeName="stroke-dashoffset" from="15.62" to="0" dur="0.5s" begin="0.9s" fill="freeze"/>
+  </line>
+  <circle cx="30" cy="28" r="5.5" fill="#0071e3">
+    <animate attributeName="r" values="0;6.2;5.5" keyTimes="0;0.7;1" dur="0.4s" begin="1.3s" fill="freeze"/>
+    <animate attributeName="r" values="5.5;6.3;5.5" keyTimes="0;0.5;1" dur="3s" begin="1.7s" repeatCount="indefinite"/>
+  </circle>
+  <text class="q-text" x="72" y="41" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="30" font-weight="600" letter-spacing="-0.5" opacity="1">Qovu<animate attributeName="opacity" from="0" to="1" dur="0.8s" begin="1.5s" fill="freeze"/></text>
+</svg>
