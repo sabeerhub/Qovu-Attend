@@ -20,7 +20,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
  * and the profile row is created on the first sign-in instead
  * (SignInForm calls the same helper).
  */
-export function SignUpForm({ onSignIn }: { onSignIn?: () => void }) {
+export function SignUpForm({
+  onSignIn,
+  onPrivacy,
+  onTerms,
+}: {
+  onSignIn?: () => void;
+  onPrivacy?: () => void;
+  onTerms?: () => void;
+}) {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -174,6 +182,19 @@ export function SignUpForm({ onSignIn }: { onSignIn?: () => void }) {
               <button type="button" className="font-medium text-accent" onClick={onSignIn}>
                 Sign in
               </button>
+            </p>
+          ) : null}
+          {onPrivacy && onTerms ? (
+            <p className="text-center text-[13px] text-muted">
+              By continuing, you agree to the{' '}
+              <button type="button" className="font-medium text-accent" onClick={onTerms}>
+                Terms
+              </button>{' '}
+              and{' '}
+              <button type="button" className="font-medium text-accent" onClick={onPrivacy}>
+                Privacy Policy
+              </button>
+              .
             </p>
           ) : null}
         </form>

@@ -133,6 +133,18 @@ via the unique constraint. See `docs/API_CONTRACTS.md`.
 
 Unique `(lecturer_id, course_id, day_of_week, start_time)` — the same lecture cannot be planned twice. Indexes on `lecturer_id` and `course_id`.
 
+### contact_reports (v0.8.2 — Contact us / Report a problem)
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| name | text, not null | check 2–100 chars |
+| email | text, not null | check 3–255 chars |
+| topic | text, not null | check in ('problem', 'question', 'feedback') |
+| message | text, not null | check 10–4000 chars |
+| created_at | timestamptz, default now() | |
+
+Index on `created_at` (desc). RLS: anonymous INSERT only (`with check (true)`) — no public SELECT, UPDATE or DELETE policy, so reports are read only by the owner in the Supabase dashboard, never from the client.
+
 ### attendance_sessions
 | Column | Type | Notes |
 |---|---|---|

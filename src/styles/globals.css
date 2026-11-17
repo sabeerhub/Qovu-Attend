@@ -95,6 +95,23 @@
   animation: splash-word-in 0.6s ease-out 3.9s forwards;
 }
 
+/* Scroll reveal (v0.8.2): landing sections and cartoons fade in
+   with a slight rise when they scroll into view. Calm, one easing,
+   no bounce. Content is visible by default — the hook only hides
+   it when a working IntersectionObserver exists and motion is
+   allowed — and reduced motion shows everything at once. */
+.reveal {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 0.7s ease,
+    transform 0.7s ease;
+}
+.reveal-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 /* Skeleton loading (v0.7.0): neutral grey blocks in the shape of
    the content that is coming, with a calm opacity pulse. */
 .skeleton {
@@ -113,6 +130,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
   .splash-screen,
   .splash-ring,
   .splash-tail,

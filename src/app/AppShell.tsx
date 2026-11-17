@@ -9,6 +9,10 @@ import { MobileNav, Sidebar } from '@/components/layout/Sidebar';
 import { SignInForm } from '@/features/authentication/SignInForm';
 import { SignUpForm } from '@/features/authentication/SignUpForm';
 import { LandingPage } from '@/features/landing/LandingPage';
+import { ContactPage } from '@/features/contact/ContactPage';
+import { PrivacyPage } from '@/features/legal/PrivacyPage';
+import { TermsPage } from '@/features/legal/TermsPage';
+import type { PublicPageNav } from '@/components/layout/PublicPageLayout';
 import { SubmitAttendance } from '@/features/submission/SubmitAttendance';
 import { SubmitEntry } from '@/features/submission/SubmitEntry';
 import { DepartmentList } from '@/features/departments/DepartmentList';
@@ -103,13 +107,36 @@ export function AppShell() {
   }
 
   if (auth.status === 'signed-out') {
+    // Shared navigation for every public page (v0.8.2): landing,
+    // contact, privacy, terms, sign-in and sign-up all move through
+    // the same state machine, so the back button works everywhere.
+    const publicNav: PublicPageNav = {
+      onHome: () => goAuth('landing'),
+      onSignIn: () => goAuth('signin'),
+      onSignUp: () => goAuth('signup'),
+      onContact: () => goAuth('contact'),
+      onPrivacy: () => goAuth('privacy'),
+      onTerms: () => goAuth('terms'),
+    };
     if (authView === 'landing') {
       return (
         <LandingPage
           onSignIn={() => goAuth('signin')}
           onSignUp={() => goAuth('signup')}
+          onContact={() => goAuth('contact')}
+          onPrivacy={() => goAuth('privacy')}
+          onTerms={() => goAuth('terms')}
         />
       );
+    }
+    if (authView === 'contact') {
+      return <ContactPage nav={publicNav} />;
+    }
+    if (authView === 'privacy') {
+      return <PrivacyPage nav={publicNav} />;
+    }
+    if (authView === 'terms') {
+      return <TermsPage nav={publicNav} />;
     }
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-surface px-4">
@@ -120,9 +147,9 @@ export function AppShell() {
           <p className="mt-1 text-[13px] text-muted">Lecturer Portal</p>
         </div>
         {authView === 'signup' ? (
-          <SignUpForm onSignIn={() => goAuth('signin')} />
+          <SignUpForm onSignIn={() => goAuth('signin')} onPrivacy={() => goAuth('privacy')} onTerms={() => goAuth('terms')} />
         ) : (
-          <SignInForm onSignUp={() => goAuth('signup')} />
+          <SignInForm onSignUp={() => goAuth('signup')} onPrivacy={() => goAuth('privacy')} onTerms={() => goAuth('terms')} />
         )}
       </div>
     );

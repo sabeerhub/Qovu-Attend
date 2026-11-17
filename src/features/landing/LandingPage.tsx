@@ -1,104 +1,149 @@
-import { QovuBrand } from '@/components/brand/QovuBrand';
+import { PublicTopBar } from '@/components/layout/PublicTopBar';
 import { Button } from '@/components/ui/button';
+import { Reveal } from '@/components/ui/reveal';
 import { LandingIllustration } from './LandingIllustration';
+import {
+  CodeIllustration,
+  HallCheckIllustration,
+  WeekPlanIllustration,
+} from './SectionIllustrations';
 
 /**
- * Public landing page (v0.8.1 rebuild), shown at `/` to logged-out
- * visitors. Apple landing-page level, not scattered: one centred
- * hero (mark, one headline, one sentence, two buttons), one small
- * hand-built cartoon underneath it, then a short "How it works"
- * and a single minimal features strip — nothing else. Logged-in
- * lecturers never see this page; they go straight to the
+ * Public landing page (v0.8.2 rebuild) — a true Apple-style scroll
+ * story, not a crowded grid. Slim sticky top bar; one big hero with
+ * huge type and the lecturer-and-QR cartoon; then three sections,
+ * one idea each, alternating white and canvas, each with a huge
+ * headline, one short sentence, and one small cartoon that animates
+ * in on scroll. A short closing call to action, then a real footer
+ * with links to Contact, Privacy Policy and Terms & Conditions.
+ * Logged-in lecturers never see this page; they go straight to the
  * dashboard. Students never need an account.
  */
 export function LandingPage({
   onSignIn,
   onSignUp,
+  onContact,
+  onPrivacy,
+  onTerms,
 }: {
   onSignIn: () => void;
   onSignUp: () => void;
+  onContact: () => void;
+  onPrivacy: () => void;
+  onTerms: () => void;
 }) {
   return (
     <div className="flex min-h-screen flex-col bg-surface">
-      <header className="mx-auto flex w-full max-w-[1120px] items-center justify-between px-4 py-4 md:px-6">
-        <QovuBrand markSize={24} textClassName="text-[17px]" />
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" onClick={onSignIn}>
-            Sign in
-          </Button>
-          <Button onClick={onSignUp}>Create account</Button>
-        </div>
-      </header>
+      <PublicTopBar
+        onHome={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        onSignIn={onSignIn}
+        onSignUp={onSignUp}
+      />
 
-      <main className="mx-auto flex w-full max-w-[1120px] flex-1 flex-col items-center px-4 text-center md:px-6">
-        {/* Hero — one idea, centred */}
-        <section className="flex flex-col items-center gap-5 py-16 md:py-24">
-          <img src="/favicon.svg" alt="" aria-hidden="true" width={64} height={64} />
-          <h1 className="max-w-[640px] text-[40px] font-semibold leading-tight tracking-tight text-ink md:text-[56px]">
+      <main className="flex-1">
+        {/* Hero — one idea, huge type, the cartoon underneath */}
+        <section className="mx-auto flex w-full max-w-[1120px] flex-col items-center px-4 pb-20 pt-20 text-center md:px-6 md:pb-28 md:pt-28">
+          <img src="/favicon.svg" alt="" aria-hidden="true" width={72} height={72} />
+          <h1 className="mt-6 max-w-[800px] text-[48px] font-semibold leading-[1.05] tracking-tight text-ink md:text-[72px]">
             Attendance, verified.
           </h1>
-          <p className="max-w-[560px] text-[17px] leading-relaxed text-muted">
+          <p className="mt-5 max-w-[560px] text-[17px] leading-relaxed text-muted md:text-[21px]">
             Qovu is attendance you can trust. The lecturer shows a code,
             students mark themselves present, and Qovu checks they are
             really in the room.
           </p>
-          <div className="mt-2 flex flex-wrap justify-center gap-2">
+          <div className="mt-8 flex flex-wrap justify-center gap-2">
             <Button onClick={onSignUp}>Create account</Button>
             <Button variant="secondary" onClick={onSignIn}>
               Sign in
             </Button>
           </div>
-          <p className="text-[13px] text-faint">For lecturers. Students never need an account.</p>
-          <div className="mt-8 w-full max-w-[560px]">
+          <p className="mt-4 text-[13px] text-faint">For lecturers. Students never need an account.</p>
+          <div className="mt-14 w-full max-w-[720px]">
             <LandingIllustration />
           </div>
         </section>
 
-        {/* How it works — three steps, nothing else */}
-        <section className="w-full border-t border-line py-16">
-          <h2 className="text-[17px] font-semibold text-ink">How it works</h2>
-          <ol className="mx-auto mt-8 grid max-w-[880px] gap-8 text-center md:grid-cols-3">
-            <li className="flex flex-col items-center gap-1.5">
-              <p className="text-[13px] font-medium text-faint">1</p>
-              <p className="text-[15px] font-medium text-ink">The lecturer starts a session</p>
-              <p className="text-[13px] leading-relaxed text-muted">
-                Create a session for your course. When the lecture begins,
-                project the QR code or read out the 6-digit code.
+        {/* 1 — Show the code. Canvas, so the story breathes. */}
+        <section className="bg-canvas">
+          <div className="mx-auto flex w-full max-w-[1120px] flex-col items-center px-4 py-24 text-center md:px-6 md:py-32">
+            <Reveal>
+              <h2 className="text-[32px] font-semibold leading-tight tracking-tight text-ink md:text-[48px]">
+                Show the code.
+              </h2>
+              <p className="mx-auto mt-4 max-w-[520px] text-[17px] leading-relaxed text-muted">
+                When the lecture begins, project the QR code or read out the
+                6-digit code. That is the whole setup.
               </p>
-            </li>
-            <li className="flex flex-col items-center gap-1.5">
-              <p className="text-[13px] font-medium text-faint">2</p>
-              <p className="text-[15px] font-medium text-ink">Students mark themselves present</p>
-              <p className="text-[13px] leading-relaxed text-muted">
-                Students scan the code or type it in. No account, no app to
-                install — just a registration number.
-              </p>
-            </li>
-            <li className="flex flex-col items-center gap-1.5">
-              <p className="text-[13px] font-medium text-faint">3</p>
-              <p className="text-[15px] font-medium text-ink">Qovu checks they are really there</p>
-              <p className="text-[13px] leading-relaxed text-muted">
-                Location must be within 30 metres of the lecturer, one device
-                per student, and the count is checked against the lecturer’s
-                headcount.
-              </p>
-            </li>
-          </ol>
+              <div className="mx-auto mt-12 w-full max-w-[560px]">
+                <CodeIllustration />
+              </div>
+            </Reveal>
+          </div>
         </section>
 
-        {/* Features — one quiet strip, no boxes, no filler */}
-        <section className="w-full border-t border-line py-10">
-          <p className="text-[13px] leading-relaxed text-muted">
-            30 m location check&nbsp;&nbsp;·&nbsp;&nbsp;One device per student&nbsp;&nbsp;·&nbsp;&nbsp;Headcount
-            cross-check
-          </p>
+        {/* 2 — Only the hall counts. */}
+        <section>
+          <div className="mx-auto flex w-full max-w-[1120px] flex-col items-center px-4 py-24 text-center md:px-6 md:py-32">
+            <Reveal>
+              <h2 className="text-[32px] font-semibold leading-tight tracking-tight text-ink md:text-[48px]">
+                Only the hall counts.
+              </h2>
+              <p className="mx-auto mt-4 max-w-[520px] text-[17px] leading-relaxed text-muted">
+                A student must be within 30 metres of where you activated
+                the session, on a device that has not marked anyone else
+                present. A friend at home cannot check in for them.
+              </p>
+              <div className="mx-auto mt-12 w-full max-w-[560px]">
+                <HallCheckIllustration />
+              </div>
+            </Reveal>
+          </div>
+        </section>
+
+        {/* 3 — Your week, planned. Canvas again. */}
+        <section className="bg-canvas">
+          <div className="mx-auto flex w-full max-w-[1120px] flex-col items-center px-4 py-24 text-center md:px-6 md:py-32">
+            <Reveal>
+              <h2 className="text-[32px] font-semibold leading-tight tracking-tight text-ink md:text-[48px]">
+                Your week, planned.
+              </h2>
+              <p className="mx-auto mt-4 max-w-[520px] text-[17px] leading-relaxed text-muted">
+                Add each lecture once — course, day, time, room — and when
+                the lecture starts, one tap turns it into a live session.
+              </p>
+              <div className="mx-auto mt-12 w-full max-w-[560px]">
+                <WeekPlanIllustration />
+              </div>
+            </Reveal>
+          </div>
+        </section>
+
+        {/* Closing — one line, one button, nothing else */}
+        <section className="mx-auto flex w-full max-w-[1120px] flex-col items-center px-4 py-24 text-center md:px-6 md:py-32">
+          <h2 className="text-[32px] font-semibold leading-tight tracking-tight text-ink md:text-[48px]">
+            Ready when your next lecture starts.
+          </h2>
+          <div className="mt-8">
+            <Button onClick={onSignUp}>Create account</Button>
+          </div>
         </section>
       </main>
 
       <footer className="border-t border-line">
-        <div className="mx-auto flex w-full max-w-[1120px] items-center justify-between px-4 py-6 md:px-6">
+        <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-3 px-4 py-8 md:flex-row md:items-center md:justify-between md:px-6">
           <p className="text-[13px] text-muted">Qovu — Attendance, verified.</p>
-          <p className="text-[13px] text-faint">Lecturer Portal</p>
+          <nav className="flex flex-wrap gap-6 text-[13px]" aria-label="Footer">
+            <button type="button" className="text-muted hover:text-ink" onClick={onContact}>
+              Contact us
+            </button>
+            <button type="button" className="text-muted hover:text-ink" onClick={onPrivacy}>
+              Privacy Policy
+            </button>
+            <button type="button" className="text-muted hover:text-ink" onClick={onTerms}>
+              Terms &amp; Conditions
+            </button>
+          </nav>
         </div>
       </footer>
     </div>

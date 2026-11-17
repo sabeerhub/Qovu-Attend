@@ -6,7 +6,15 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 /** Lecturer sign-in, wired to Supabase Auth. No fake login. */
-export function SignInForm({ onSignUp }: { onSignUp?: () => void }) {
+export function SignInForm({
+  onSignUp,
+  onPrivacy,
+  onTerms,
+}: {
+  onSignUp?: () => void;
+  onPrivacy?: () => void;
+  onTerms?: () => void;
+}) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +82,19 @@ export function SignInForm({ onSignUp }: { onSignUp?: () => void }) {
               <button type="button" className="font-medium text-accent" onClick={onSignUp}>
                 Create an account
               </button>
+            </p>
+          ) : null}
+          {onPrivacy && onTerms ? (
+            <p className="text-center text-[13px] text-muted">
+              By continuing, you agree to the{' '}
+              <button type="button" className="font-medium text-accent" onClick={onTerms}>
+                Terms
+              </button>{' '}
+              and{' '}
+              <button type="button" className="font-medium text-accent" onClick={onPrivacy}>
+                Privacy Policy
+              </button>
+              .
             </p>
           ) : null}
         </form>

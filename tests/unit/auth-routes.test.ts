@@ -12,7 +12,20 @@ describe('getAuthView — lecturer-portal auth routing (v0.7.0)', () => {
     expect(getAuthView('/signup')).toBe('signup');
   });
 
+  it('routes the public pages — contact, privacy, terms', () => {
+    expect(getAuthView('/contact')).toBe('contact');
+    expect(getAuthView('/privacy')).toBe('privacy');
+    expect(getAuthView('/terms')).toBe('terms');
+  });
+
   it('maps every view to its path', () => {
-    expect(AUTH_VIEW_PATHS).toEqual({ landing: '/', signin: '/signin', signup: '/signup' });
+    expect(AUTH_VIEW_PATHS).toEqual({
+      landing: '/',
+      signin: '/signin',
+      signup: '/signup',
+      contact: '/contact',
+      privacy: '/privacy',
+      terms: '/terms',
+    });
   });
 });
