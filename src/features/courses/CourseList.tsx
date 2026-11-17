@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useAssignments } from '@/hooks/useAssignments';
+import { useAssignments, type AssignedCourse } from '@/hooks/useAssignments';
 import { CourseForm } from './CourseForm';
+import { CourseStudents } from '@/features/students/CourseStudents';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState, ErrorState } from '@/components/ui/empty-state';
@@ -22,6 +23,9 @@ export function CourseList() {
   const state = useAssignments(refreshKey);
   const [departmentFilter, setDepartmentFilter] = useState<string>('');
   const [showForm, setShowForm] = useState(false);
+  // A course's Students view (v0.9.0): the class list lives inside
+  // its course — there is no separate top-level nav item for it.
+  const [selectedCourse, setSelectedCourse] = useState<AssignedCourse | null>(null);
 
   if (state.status === 'not-configured') {
     return (
@@ -43,6 +47,15 @@ export function CourseList() {
   }
 
   const { departments, courses } = state.data;
+
+  if (selectedCourse) {
+    return (
+      <CourseStudents
+        course={selectedCourse}
+        onBack={() => setSelectedCourse(null)}
+      />
+    );
+  }
 
   const filtered = departmentFilter
     ? courses.filter((c) => c.department_id === departmentFilter)
@@ -118,6 +131,15 @@ export function CourseList() {
                         : ''}
                       {` · ${course.academicSessionName}`}
                     </p>
+                    <div className="mt-3">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => setSelectedCourse(course)}
+                      >
+                        Students
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ))}

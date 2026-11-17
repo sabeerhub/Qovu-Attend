@@ -39,7 +39,15 @@
 //   4. Registration number normalised (trim + uppercase).
 //   5. Idempotency: a row with the same (session_id, idempotency_key)
 //      is returned as-is (200, duplicate: true, retried: true).
-//   6. Location (Phase 4): the submission MUST carry the student's
+//   6. Roster (v0.9.0): the submitted number must be on the
+//      session's course class list — but only when the list is not
+//      empty. An empty list means the lecturer has not added
+//      students yet, and the submission is allowed exactly as
+//      before (see rosterCheck.ts). A number not on a non-empty
+//      list is refused (403 reg_number_not_registered). The check
+//      runs after idempotency on purpose: a retried submission
+//      still returns its original record.
+//   7. Location (Phase 4): the submission MUST carry the student's
 //      device coordinates. Missing/invalid coordinates are refused
 //      (400 location_required) — there is no submission without a
 //      location, and no fallback. The server computes the Haversine
@@ -52,7 +60,7 @@
 //      is display-only; the server decides. A session with no anchor
 //      (activated before v0.5.0) refuses submissions until it is
 //      closed and reopened (409 location_not_configured).
-//   7. Device binding (Phase 4): the submission MUST carry the
+//   8. Device binding (Phase 4): the submission MUST carry the
 //      SHA-256 device-fingerprint hash (64 hex chars; raw device
 //      attributes never leave the phone). The first submission binds
 //      the device to one registration number
@@ -62,10 +70,10 @@
 //      One device may submit once per session (partial unique index
 //      on (session_id, device_fingerprint_hash); a second attempt
 //      maps to 409 device_already_used).
-//   8. Uniqueness: the DB unique constraint on (session_id,
+//   9. Uniqueness: the DB unique constraint on (session_id,
 //      registration_number) is the backstop; a violation maps to
 //      409 duplicate_registration (the student already submitted).
-//   9. Record inserted with status 'verified' and verification_method
+//   10. Record inserted with status 'verified' and verification_method
 //      'qr' or 'passcode', derived server-side, plus the device
 //      fingerprint hash.
 //
@@ -104,6 +112,7 @@ import {
   type ActiveSessionRow,
   type PasscodeSessionQuery,
 } from './resolveSession.ts';
+import { checkRosterMembership, type RosterQuery } from './rosterCheck.ts';
 import { createValidateRateLimiter } from './validateRateLimit.ts';
 
 // --- Best-effort in-memory rate limit (see header note) ---
@@ -310,7 +319,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (!session) {
     const { data, error: sessionError } = await supabase
       .from('attendance_sessions')
-      .select('id, status, qr_token_hash, qr_token_issued_at, passcode_hash, qr_expires_in_seconds, anchor_latitude, anchor_longitude, location_radius_meters')
+      .select('id, course_id, status, qr_token_hash, qr_token_issued_at, passcode_hash, qr_expires_in_seconds, anchor_latitude, anchor_longitude, location_radius_meters')
       .eq('id', sessionId)
       .maybeSingle();
     if (sessionError) {
@@ -362,7 +371,25 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
   }
 
-  // 6. Location (Phase 4): the server decides, from the lecturer
+  // 6. Roster (v0.9.0): the number must be on the course's class
+  //    list when the list is not empty. Runs after idempotency so a
+  //    retried submission still returns its original record, and
+  //    before location/device so a stranger gets a fast, clear
+  //    refusal without spending their location or device checks.
+  const roster = await checkRosterMembership(
+    supabase as unknown as RosterQuery,
+    session.course_id,
+    registrationNumber,
+  );
+  if (!roster.ok) {
+    return errorResponse(
+      roster.code,
+      roster.message,
+      roster.code === 'server_error' ? 500 : 403,
+    );
+  }
+
+  // 7. Location (Phase 4): the server decides, from the lecturer
   //    anchor captured at activation. No anchor, no submission.
   const anchorLat = session.anchor_latitude as number | null;
   const anchorLon = session.anchor_longitude as number | null;
@@ -400,7 +427,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     );
   }
 
-  // 7. Device binding (Phase 4): one device, one registration
+  // 8. Device binding (Phase 4): one device, one registration
   //    number. First submission binds the device; a later one for a
   //    different number is refused.
   const { data: binding, error: bindingError } = await supabase
@@ -445,7 +472,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
   }
 
-  // 8 + 9. Insert; the unique constraints are the duplicate backstops.
+  // 9 + 10. Insert; the unique constraints are the duplicate backstops.
   const { data: record, error: insertError } = await supabase
     .from('attendance_records')
     .insert({

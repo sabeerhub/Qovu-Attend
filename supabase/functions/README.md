@@ -7,7 +7,7 @@ documented paths before pilot.
 
 | Function | Purpose |
 |---|---|
-| `attendance-submit` | Public student submission: validate session state, QR token / passcode hash + server-side expiry, enforce uniqueness + idempotency, derive status server-side. No student account. |
+| `attendance-submit` | Public student submission: validate session state, QR token / passcode hash + server-side expiry, roster (class-list) check — a number not on a non-empty course list is refused (`reg_number_not_registered`); an empty list accepts anyone — enforce uniqueness + idempotency, derive status server-side. No student account. |
 | `session-transition` | Lecturer lifecycle transitions with ownership check + audit logging. Generates the QR token + passcode on activation (hashes only are stored). |
 | `manual-attendance` | Lecturer manual add + record correction, both reason-required and audit-logged. Refuses finalized / archived sessions. |
 | `contact-notify` | Emails one saved contact report to the owner via Resend (premium HTML + plain text, PNG logo). Called fire-and-forget by the contact form after the report saves. Needs the `RESEND_API_KEY` secret (set by the owner in the Supabase dashboard); the recipient is `mustaphaabdulsalam1666@gmail.com` unless the `CONTACT_REPORT_EMAIL` secret overrides it. |

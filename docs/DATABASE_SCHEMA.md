@@ -106,6 +106,17 @@ atomically; returns the created course. Duplicate code in the same
 department + semester raises a clean `course_code_duplicate` error
 via the unique constraint. See `docs/API_CONTRACTS.md`.
 
+### course_students (v0.9.0 — Student roster)
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| course_id | uuid FK → courses, not null, cascade delete | deleting a course deletes its class list |
+| reg_number | text, not null | check 1–100 chars; stored normalized (trim + upper) by trigger |
+| student_name | text, nullable | check ≤ 100 chars when set; empty becomes null |
+| created_at | timestamptz, default now() | |
+
+Unique `(course_id, reg_number)` — one student appears once per course. Index on `course_id`. RLS: a lecturer reads/writes only rows for courses they are assigned to (course-level assignment, or department-level assignment with a null `course_id`) — the same ownership rule as courses. A `BEFORE INSERT OR UPDATE` trigger normalizes `reg_number` (trim + uppercase) and trims the name.
+
 ### lecture_rooms
 | Column | Type | Notes |
 |---|---|---|
@@ -260,3 +271,10 @@ current_lecturer_id()`); there is no direct client insert policy —
 inserts go through the `create_lecture_plan` RPC, which refuses any
 course the caller is not assigned to. The update policy's WITH
 CHECK also re-verifies course ownership on the new row.
+
+v0.9.0 addition (`20261117050000_course_students.sql`): the
+`course_students` table (see below). A lecturer reads, inserts,
+updates and deletes only rows for courses they are assigned to
+(course-level assignment, or department-level assignment with a
+null `course_id`) — the same ownership rule as `courses`. Writes go
+through the normal authenticated client under these policies.

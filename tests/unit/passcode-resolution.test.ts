@@ -7,6 +7,7 @@ import {
 
 function makeRow(overrides: Partial<ActiveSessionRow> & { id: string }): ActiveSessionRow {
   return {
+    course_id: 'course-1',
     status: 'active',
     qr_token_hash: null,
     qr_token_issued_at: '2026-11-16T10:00:00.000Z',

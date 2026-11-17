@@ -182,3 +182,30 @@ export function LecturePlanSkeleton() {
     </div>
   );
 }
+
+/** Mirrors the course Students view: header + student table rows. */
+export function StudentListSkeleton() {
+  return (
+    <div aria-label="Loading students">
+      <LoadingLabel label="Loading students…" />
+      <div className="flex flex-col">
+        <div className="flex gap-4 border-b border-line py-2">
+          <Block className="h-3 w-1/3" />
+          <Block className="h-3 w-1/4" />
+        </div>
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex items-center gap-4 border-b border-line py-3 last:border-b-0"
+          >
+            <Block className="h-4 w-1/3" />
+            <Block className="h-3.5 w-1/4" />
+            <div className="ml-auto">
+              <Block className="h-9 w-16" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

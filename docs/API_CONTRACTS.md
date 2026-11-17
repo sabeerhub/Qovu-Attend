@@ -220,6 +220,20 @@ already submitted in this session (`device_already_used`). A session
 with no anchor (activated before v0.5.0) refuses submissions until
 closed and reopened (`location_not_configured`).
 
+Roster (v0.9.0) — the class-list check, master prompt Rule 4. After
+the session is resolved and the idempotency check, before location
+and device: when the session's course has students on its class
+list (`course_students`), the submitted registration number must be
+on that list — otherwise `403 reg_number_not_registered` ("This
+registration number is not on this course's list. Ask your lecturer
+to add you."). When the list is empty, any registration number is
+accepted exactly as before, so a lecturer who has not added
+students yet is never locked out. The check is server-side (the
+function re-reads the list; at most two cheap indexed queries) and
+runs identically on the QR-token path and the passcode path. It runs
+after idempotency on purpose, so a retried submission still returns
+its original record.
+
 Success (200):
 
 ```json
@@ -242,6 +256,7 @@ Errors:
 | 400 | `location_too_imprecise` | Reported accuracy worse than 100 m |
 | 401 | `invalid_token` | Token/passcode hash does not match the session; in the passcode-only flow also when zero or more than one active session matches the passcode; the `validate` action also answers this when the code is expired or its session has no anchor |
 | 403 | `outside_location` | Student is more than 30 m from the lecturer anchor |
+| 403 | `reg_number_not_registered` | Registration number is not on the course's class list (list is non-empty) |
 | 403 | `device_bound_to_another_student` | Device is already bound to a different registration number |
 | 404 | `session_not_found` | No such session |
 | 409 | `session_not_active` | Session is not `active` |

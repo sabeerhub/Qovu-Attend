@@ -131,6 +131,28 @@ must be recorded in the audit log. Any transition to `active`
 - Record statuses: `verified`, `manual`, `pending`, `rejected`,
   `suspicious`.
 
+## Student roster (v0.9.0 — implemented, untested live)
+
+- Each course has a class list: registration numbers (and optional
+  names) the lecturer adds one by one or imports from a CSV file
+  (with a preview first — nothing is saved until confirmed).
+- Registration numbers are stored normalized (trimmed + uppercased),
+  so `u19/cs/001` and `U19/CS/001` are the same student; one student
+  appears once per course.
+- **Roster rule (master prompt Rule 4), enforced server-side in
+  `attendance-submit`:** when a course's class list is not empty,
+  only registration numbers on that list can submit attendance. A
+  number that is not on the list is refused with
+  `reg_number_not_registered` ("This registration number is not on
+  this course's list. Ask your lecturer to add you.").
+- **Empty-list fallback (deliberate):** when a course has no students
+  on its list yet, any registration number is accepted exactly as
+  before — a lecturer who has not added students is never locked out
+  of their own hall. The moment the first student is added, the list
+  starts being enforced.
+- Manual attendance by the lecturer is not roster-checked: the
+  lecturer is in the hall and authorizes it with a reason.
+
 ## Headcount vs. submissions
 
 - During an active session the dashboard shows physical headcount,

@@ -29,6 +29,7 @@
 
 export interface ActiveSessionRow {
   id: string;
+  course_id: string;
   status: string;
   qr_token_hash: string | null;
   qr_token_issued_at: string | null;
@@ -64,7 +65,7 @@ export type ResolveSessionResult =
   | { ok: false; code: 'invalid_token' | 'server_error'; message: string };
 
 export const PASSCODE_SESSION_COLUMNS =
-  'id, status, qr_token_hash, qr_token_issued_at, passcode_hash, qr_expires_in_seconds, anchor_latitude, anchor_longitude, location_radius_meters';
+  'id, course_id, status, qr_token_hash, qr_token_issued_at, passcode_hash, qr_expires_in_seconds, anchor_latitude, anchor_longitude, location_radius_meters';
 
 const INVALID_CODE_MESSAGE =
   'The passcode is not valid for a live session right now. Check the code and try again.';

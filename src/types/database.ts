@@ -106,6 +106,21 @@ export interface LecturePlan {
   updated_at: string;
 }
 
+/**
+ * Course roster (v0.9.0): one registered student in a course.
+ * reg_number is stored normalized (trimmed + uppercased) by a
+ * database trigger, so "u19/cs/001" and "U19/CS/001" are the same
+ * student. student_name is optional. A row is deleted with its
+ * course (ON DELETE CASCADE).
+ */
+export interface CourseStudent {
+  id: string;
+  course_id: string;
+  reg_number: string;
+  student_name: string | null;
+  created_at: string;
+}
+
 export interface AttendanceSession {
   id: string;
   course_id: string;
