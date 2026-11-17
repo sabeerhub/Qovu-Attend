@@ -10,6 +10,7 @@ import {
   validateCorrection,
   validateManualAttendance,
 } from '@/lib/submission';
+import { attemptReasonText } from '@/lib/attempts';
 import { correctRecord, manualAdd, reviewFace, transitionSession } from '@/lib/edgeFunctions';
 import { BulkMarkAll } from './BulkMarkAll';
 import { QrDisplay } from './QrDisplay';
@@ -20,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/empty-state';
 import type {
+  AttendanceAttempt,
   AttendanceRecord,
   AttendanceRecordStatus,
   AttendanceSession,
@@ -200,6 +202,16 @@ export function SessionMonitor({
     | { status: 'error'; message: string }
     | { status: 'ready'; records: AttendanceRecord[] }
   >({ status: 'loading' });
+  // Refused tries (v0.16.0): every blocked try in this session,
+  // written by attendance-submit into attendance_attempts. Loaded
+  // separately from the records, so a failure here (for example
+  // the migration has not been applied yet) never breaks the
+  // rest of the monitor.
+  const [attemptsState, setAttemptsState] = useState<
+    | { status: 'loading' }
+    | { status: 'error'; message: string }
+    | { status: 'ready'; attempts: AttendanceAttempt[] }
+  >({ status: 'loading' });
   const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
   const [acting, setActing] = useState<SessionStatus | null>(null);
   // Location permission gate (v0.5.1): activation first asks the
@@ -260,6 +272,29 @@ export function SessionMonitor({
   useEffect(() => {
     void loadRecords();
   }, [loadRecords]);
+
+  const loadAttempts = useCallback(async () => {
+    if (!supabase) return;
+    setAttemptsState({ status: 'loading' });
+    try {
+      const { data, error } = await supabase
+        .from('attendance_attempts')
+        .select('id, session_id, registration_number, reason, attempted_at')
+        .eq('session_id', session.id)
+        .order('attempted_at', { ascending: false });
+      if (error) setAttemptsState({ status: 'error', message: error.message });
+      else setAttemptsState({ status: 'ready', attempts: (data ?? []) as AttendanceAttempt[] });
+    } catch (err: unknown) {
+      setAttemptsState({
+        status: 'error',
+        message: err instanceof Error ? err.message : 'Could not load refused tries.',
+      });
+    }
+  }, [session.id]);
+
+  useEffect(() => {
+    void loadAttempts();
+  }, [loadAttempts]);
 
   const records = recordsState.status === 'ready' ? recordsState.records : [];
   const summary = summarizeRecords(records);
@@ -585,7 +620,13 @@ export function SessionMonitor({
       <section>
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-[17px] font-semibold text-ink">Submitted registration numbers</h3>
-          <Button variant="secondary" onClick={() => void loadRecords()}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              void loadRecords();
+              void loadAttempts();
+            }}
+          >
             Refresh
           </Button>
         </div>
@@ -791,6 +832,84 @@ export function SessionMonitor({
               );
             })()
           : null}
+      </section>
+
+      {/* Refused tries (v0.16.0): every blocked try in this
+          session — who tried, why it was refused, and when.
+          Newest first. Refused tries are never counted as
+          attendance and never change any count above; a refused
+          try is a record of what happened, not proof of cheating. */}
+      <section>
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-[17px] font-semibold text-ink">
+            Refused tries
+            {attemptsState.status === 'ready' ? ` (${attemptsState.attempts.length})` : ''}
+          </h3>
+          <Button variant="secondary" onClick={() => void loadAttempts()}>
+            Refresh
+          </Button>
+        </div>
+        {attemptsState.status === 'loading' ? (
+          <LoadingState label="Loading refused tries…" />
+        ) : attemptsState.status === 'error' ? (
+          <ErrorState
+            message="Could not load refused tries."
+            hint="The rest of this session still works. If the attendance-attempts migration has not been applied yet, the refused-tries list stays empty until it is."
+            onRetry={() => void loadAttempts()}
+          />
+        ) : attemptsState.attempts.length === 0 ? (
+          <EmptyState
+            title="No refused tries"
+            description="Nobody has been refused in this session yet."
+          />
+        ) : (
+          <>
+            {/* Phones (v0.13.0): one card per refused try. The
+                table stays on desktop. */}
+            <ul className="flex flex-col gap-3 md:hidden">
+              {attemptsState.attempts.map((attempt) => (
+                <li
+                  key={attempt.id}
+                  className="rounded-xl border border-line bg-surface p-4 shadow-card"
+                >
+                  <p className="text-[15px] font-medium text-ink">
+                    {attempt.registration_number}
+                  </p>
+                  <p className="mt-0.5 text-[13px] text-muted">
+                    {attemptReasonText(attempt.reason)}
+                  </p>
+                  <p className="mt-0.5 text-[13px] text-muted">
+                    {new Date(attempt.attempted_at).toLocaleString()}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            <table className="hidden w-full text-left text-sm md:table">
+              <thead>
+                <tr className="border-b border-line text-[12px] uppercase text-muted">
+                  <th className="py-2 pr-4 font-medium">Registration number</th>
+                  <th className="py-2 pr-4 font-medium">Reason</th>
+                  <th className="py-2 font-medium">Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {attemptsState.attempts.map((attempt) => (
+                  <tr key={attempt.id} className="border-b border-line align-top last:border-b-0">
+                    <td className="py-3 pr-4 text-ink">{attempt.registration_number}</td>
+                    <td className="py-3 pr-4 text-muted">{attemptReasonText(attempt.reason)}</td>
+                    <td className="py-3 text-muted">
+                      {new Date(attempt.attempted_at).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+        <p className="mt-3 text-[13px] text-muted">
+          A refused try is never counted as attendance and never changes any count above.
+          It is a record of what happened — not proof of cheating.
+        </p>
       </section>
 
       <section>

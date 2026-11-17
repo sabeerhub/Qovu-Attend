@@ -99,6 +99,14 @@
 //      are no student photos on file, so it can never prove the
 //      face belongs to the number.
 //
+//   12. Refused tries (v0.16.0): every logged refusal writes one
+//      row to `attendance_attempts` (session, registration number,
+//      reason, time) so the lecturer can see it in the session
+//      monitor — see attemptLog.ts for the exact list. Logging is
+//      best-effort: if the insert fails, the original refusal
+//      still stands. Wrong-passcode guesses from the `validate`
+//      action are never logged.
+//
 // Rate limiting: a small in-memory per-session window (300 submissions
 // per session per minute — a full lecture hall scanning at once).
 // This is a best-effort guard for a single function instance — it is
@@ -135,6 +143,7 @@ import {
   type PasscodeSessionQuery,
 } from './resolveSession.ts';
 import { checkRosterMembership, type RosterQuery } from './rosterCheck.ts';
+import { logAttempt, type AttemptLogQuery } from './attemptLog.ts';
 import {
   findFaceDuplicates,
   flagFaceReview,
@@ -399,6 +408,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .eq('idempotency_key', idempotencyKey)
       .maybeSingle();
     if (existing) {
+      // Refused try (v0.16.0): a retried submission is logged,
+      // then the original record is returned unchanged.
+      await logAttempt(
+        supabase as unknown as AttemptLogQuery,
+        sessionId,
+        registrationNumber,
+        'already_submitted',
+      );
       return jsonResponse({ ok: true, duplicate: true, retried: true, record: existing });
     }
   }
@@ -413,6 +430,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
   // later, only after every refusal check has passed.
   const selfieInput = parseSelfieInput(body.selfie, body.selfieHash);
   if (!selfieInput.ok) {
+    // Refused try (v0.16.0): only a submission with NO selfie at
+    // all is logged. A malformed selfie (invalid_request) is not.
+    if (selfieInput.code === 'selfie_required') {
+      await logAttempt(
+        supabase as unknown as AttemptLogQuery,
+        sessionId,
+        registrationNumber,
+        'selfie_missing',
+      );
+    }
     return errorResponse(selfieInput.code, selfieInput.message, 400);
   }
 
@@ -427,6 +454,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
     registrationNumber,
   );
   if (!roster.ok) {
+    // Refused try (v0.16.0): only a number not on the list is
+    // logged. A database error is not a try.
+    if (roster.code === 'reg_number_not_registered') {
+      await logAttempt(
+        supabase as unknown as AttemptLogQuery,
+        sessionId,
+        registrationNumber,
+        'not_on_class_list',
+      );
+    }
     return errorResponse(
       roster.code,
       roster.message,
@@ -453,6 +490,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const reportedAccuracy =
     typeof accuracy === 'number' ? accuracy : null;
   if (reportedAccuracy !== null && reportedAccuracy > MAX_LOCATION_ACCURACY_METERS) {
+    // Refused try (v0.16.0): location too imprecise to verify.
+    await logAttempt(
+      supabase as unknown as AttemptLogQuery,
+      sessionId,
+      registrationNumber,
+      'location_imprecise',
+    );
     return errorResponse(
       'location_too_imprecise',
       'Your location is too imprecise to verify. Move somewhere with a clearer GPS signal and try again.',
@@ -465,6 +509,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
     { latitude: latitude as number, longitude: longitude as number },
   );
   if (distance > radius) {
+    // Refused try (v0.16.0): outside the hall.
+    await logAttempt(
+      supabase as unknown as AttemptLogQuery,
+      sessionId,
+      registrationNumber,
+      'outside_hall',
+    );
     return errorResponse(
       'outside_location',
       'You are too far from the lecture hall to submit attendance for this session.',
@@ -484,6 +535,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return errorResponse('server_error', bindingError.message, 500);
   }
   if (binding && binding.registration_number !== registrationNumber) {
+    // Refused try (v0.16.0): device registered to another student.
+    await logAttempt(
+      supabase as unknown as AttemptLogQuery,
+      sessionId,
+      registrationNumber,
+      'device_registered_to_other',
+    );
     return errorResponse(
       'device_bound_to_another_student',
       'This device is already registered to another student. Use the device that belongs to this registration number.',
@@ -505,6 +563,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
           .eq('device_fingerprint_hash', deviceFingerprint)
           .maybeSingle();
         if (raced && raced.registration_number !== registrationNumber) {
+          // Refused try (v0.16.0): device registered to another
+          // student (bound by a racing request first).
+          await logAttempt(
+            supabase as unknown as AttemptLogQuery,
+            sessionId,
+            registrationNumber,
+            'device_registered_to_other',
+          );
           return errorResponse(
             'device_bound_to_another_student',
             'This device is already registered to another student. Use the device that belongs to this registration number.',
@@ -564,6 +630,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
       (insertError as { code?: string }).code === '23505' &&
       message.includes('attendance_records_session_device_unique')
     ) {
+      // Refused try (v0.16.0): device already submitted in this
+      // session.
+      await logAttempt(
+        supabase as unknown as AttemptLogQuery,
+        sessionId,
+        registrationNumber,
+        'device_already_used',
+      );
       return errorResponse(
         'device_already_used',
         'This device has already submitted attendance for this session.',
@@ -571,6 +645,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
     if ((insertError as { code?: string }).code === '23505') {
+      // Refused try (v0.16.0): the number already submitted (the
+      // backstop for a second submission without the same
+      // idempotency key). The duplicate response is unchanged.
+      await logAttempt(
+        supabase as unknown as AttemptLogQuery,
+        sessionId,
+        registrationNumber,
+        'already_submitted',
+      );
       const { data: existing } = await supabase
         .from('attendance_records')
         .select('id, session_id, registration_number, status, verification_method, submitted_at, selfie_path, selfie_hash, face_review')

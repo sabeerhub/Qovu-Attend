@@ -81,6 +81,16 @@ nothing. Do not treat them as verified until that test has run.
   for retries (stable per-(session, student) key, unique index on
   `(session_id, idempotency_key)`, duplicate retries return the
   original record) are server-side concerns (Phase 2 Edge Functions).
+- Refused tries are logged (v0.16.0): every logged refusal — a
+  second submission, a device already used or registered to another
+  number, outside the hall, location too imprecise, a number not on
+  the class list, no selfie — writes one row to
+  `attendance_attempts` (session, registration number, reason,
+  time), readable only by the assigned lecturer for their own
+  sessions (the same session-lecturer RLS rule as
+  `attendance_records`). Logging is best-effort and can never change
+  a refusal. Wrong-passcode guesses from the `validate` action are
+  never logged. A refused try is never attendance.
 - Every manual entry and correction records lecturer, timestamp,
   reason and previous/new status in `attendance_audit_logs`.
 

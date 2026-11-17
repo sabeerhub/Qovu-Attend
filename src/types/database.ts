@@ -226,3 +226,28 @@ export interface AttendanceAuditLog {
   reason: string | null;
   created_at: string;
 }
+
+/**
+ * Refused-tries log (v0.16.0) — why a submission was refused.
+ * One row per logged refusal, written by the `attendance-submit`
+ * Edge Function only (service role); the lecturer reads only
+ * attempts for their own sessions. A refused try is NEVER
+ * attendance: it is never counted in any summary and never
+ * affects eligibility. No device data is stored here at all.
+ */
+export type AttendanceAttemptReason =
+  | 'already_submitted'
+  | 'device_already_used'
+  | 'device_registered_to_other'
+  | 'outside_hall'
+  | 'location_imprecise'
+  | 'not_on_class_list'
+  | 'selfie_missing';
+
+export interface AttendanceAttempt {
+  id: string;
+  session_id: string;
+  registration_number: string;
+  reason: AttendanceAttemptReason;
+  attempted_at: string;
+}

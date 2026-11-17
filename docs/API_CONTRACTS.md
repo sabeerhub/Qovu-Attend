@@ -276,6 +276,25 @@ existing record — no second row is created. The record status is
 always `verified` here, derived server-side; `verification_method` is
 `qr` or `passcode`.
 
+Refused-tries log (v0.16.0): every logged refusal writes one row to
+`attendance_attempts` (session, registration number, reason, time),
+visible to the assigned lecturer in the session monitor's "Refused
+tries" section. Logged: a second submission (`already_submitted` —
+idempotency hit, or the registration-number unique-constraint
+backstop), a device that already submitted in this session
+(`device_already_used`), a device bound to another number
+(`device_registered_to_other`), outside the hall (`outside_hall`),
+accuracy worse than 100 m (`location_imprecise`), a number not on a
+non-empty class list (`not_on_class_list`), and a submission with no
+selfie at all (`selfie_missing`). Logging is best-effort — if the
+insert fails, the original refusal still stands — and the student
+sees exactly the same refusal message as before. Never logged:
+wrong-passcode guesses from the `validate` action, malformed selfie
+input, session/token problems, rate limits, missing-field requests.
+A refused try is never attendance: it is never counted in any
+summary and never affects eligibility. Migration
+`20261118000000_attendance_attempts.sql`.
+
 Errors:
 
 | HTTP | code | Meaning |

@@ -186,6 +186,35 @@ must be recorded in the audit log. Any transition to `active`
 - Record statuses: `verified`, `manual`, `pending`, `rejected`,
   `suspicious`.
 
+## Refused tries (v0.16.0 — implemented, untested live)
+
+- **A refused submission is logged, so the lecturer can see it.**
+  Before v0.16.0 a refusal left no trace: the block worked, but
+  nothing was ever written anywhere, and the session monitor only
+  reads `attendance_records`. Now every logged refusal writes one
+  row to `attendance_attempts` (session, registration number,
+  reason, time), shown in the session monitor's "Refused tries"
+  section — newest first, with the reason in plain words.
+- **Logged:** a second submission (`already_submitted`), a device
+  that already submitted in this session (`device_already_used`),
+  a device registered to another number
+  (`device_registered_to_other`), outside the hall (`outside_hall`),
+  location too imprecise (`location_imprecise`), a number not on
+  a non-empty class list (`not_on_class_list`), and a submission
+  with no selfie at all (`selfie_missing`). The student sees
+  exactly the same refusal message as before; nothing about the
+  log ever leaks to the student.
+- **Never logged:** wrong-passcode guesses from the `validate`
+  action (no registration number there, and they are rate-limited
+  probes); malformed selfie input; session/token problems; rate
+  limits; missing-field requests.
+- **A refused try is never attendance.** It is never counted in
+  any summary, never changes a headcount difference, and never
+  affects eligibility. It is a record of what happened — not
+  proof of cheating. The lecturer decides what a try means.
+  Logging is best-effort: if the insert fails, the original
+  refusal still stands.
+
 ## Student roster (v0.9.0 — implemented, untested live)
 
 - Each course has a class list: registration numbers (and optional
