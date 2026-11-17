@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { QovuBrand } from '@/components/brand/QovuBrand';
-import { isMoreNavKey, MORE_SHEET_ITEMS, TAB_BAR_ITEMS, type TabBarKey } from '@/lib/navigation';
+import { isMoreNavKey, mobileNavActiveIndex, MORE_SHEET_ITEMS, TAB_BAR_ITEMS, type TabBarKey } from '@/lib/navigation';
 import type { NavKey } from '@/app/routes';
 
 export const NAV_ITEMS: Array<{ key: NavKey; label: string }> = [
@@ -71,14 +71,26 @@ export function Sidebar({
 }
 
 /**
- * Mobile navigation (v0.13.1): a floating frosted-white pill tab
- * bar, like the Apple Liquid Glass pill the owner sent — but in
- * our colors. The pill floats above the safe area (never glued to
- * the bottom edge), is fully rounded, translucent white with a
- * backdrop blur, a 1px hairline and a soft shadow. Active item:
- * accent-blue icon + small label inside a soft rounded highlight.
- * Inactive items: ink icon only (labels are still on every button
- * as aria-labels, so screen readers hear the section name).
+ * Mobile navigation (v0.13.2): REAL Apple liquid glass, in our
+ * colors — the owner rejected the flat v0.13.1 pill, so the pill
+ * is now a material with depth and movement, not just a
+ * translucent panel. The layers (see `.liquid-glass-*` in
+ * `src/styles/globals.css`): translucent white (65%) + strong
+ * blur and saturation, a hairline border, a bright inset top
+ * highlight (the specular rim), a soft inner bottom shadow for
+ * depth, and one soft drop shadow underneath. A slow sheen —
+ * a soft blurred white shape — drifts across the pill so the
+ * glass feels alive even when nobody taps. No gradients anywhere.
+ *
+ * The active indicator is a glassy blue pill-within-a-pill
+ * (translucent accent + blur + its own inner top highlight) that
+ * GLIDES from one slot to the next on a springy 450ms transform
+ * transition, carrying the active icon + label with it (the label
+ * pops in while the pill travels). The five buttons underneath
+ * render icons only — the active button's icon fades out so the
+ * indicator's icon is the one you see. A tap squashes the pressed
+ * item slightly (~150ms press morph). Reduced motion: static
+ * glass, static highlight, no sheen, no press morph.
  *
  * Four tabs — Overview, Courses, Sessions, History — plus a "More"
  * tab that opens a bottom sheet with My Departments, My Lecture
@@ -113,14 +125,55 @@ export function MobileNav({
   }, [moreOpen]);
 
   const moreActive = isMoreNavKey(current);
+  // The five slots the indicator can glide between: the four tabs
+  // plus More. The indicator is positioned from this index alone —
+  // one slot per step, driven by a transform, so it glides.
+  const slots: Array<{ key: TabBarKey | 'more'; label: string; icon: LucideIcon }> = [
+    ...TAB_BAR_ITEMS.map((item) => ({
+      key: item.key,
+      label: item.label,
+      icon: TAB_ICONS[item.key],
+    })),
+    { key: 'more' as const, label: 'More', icon: Ellipsis },
+  ];
+  const activeIndex = mobileNavActiveIndex(current);
+  const ActiveIcon = slots[activeIndex].icon;
 
   return (
     <>
       <nav
         aria-label="Lecturer portal"
-        className="fixed inset-x-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-[420px] rounded-full border border-line bg-surface/80 shadow-[0_8px_24px_rgba(17,17,17,0.12)] backdrop-blur-xl md:hidden"
+        className="liquid-glass-nav fixed inset-x-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-[420px] overflow-hidden rounded-full md:hidden"
       >
-        <div className="flex items-center justify-between px-2 py-1.5">
+        {/* Moving light: a soft blurred white shape drifting across
+            the glass. It sits behind the buttons, so the light
+            passes inside the pill, not over the icons. */}
+        <div
+          aria-hidden="true"
+          className="liquid-glass-sheen pointer-events-none absolute -inset-y-1/2 w-[90px] rounded-full bg-white"
+        />
+        <div className="relative flex items-center justify-between py-1.5">
+          {/* The gliding indicator: an empty glassy blue pill that
+              travels slot to slot, carrying the active icon + label.
+              pointer-events-none, so taps pass straight through to
+              the buttons underneath. */}
+          <div
+            aria-hidden="true"
+            className="liquid-glass-glide pointer-events-none absolute inset-y-1.5 left-0 z-0 w-[20%]"
+            style={{ transform: `translateX(${activeIndex * 100}%)` }}
+          >
+            <div className="liquid-glass-indicator mx-1 flex h-full flex-col items-center justify-center gap-0.5 rounded-full">
+              <div
+                key={slots[activeIndex].key}
+                className="liquid-indicator-content flex flex-col items-center justify-center gap-0.5"
+              >
+                <ActiveIcon size={22} strokeWidth={2.25} aria-hidden="true" />
+                <span className="text-[10px] font-medium leading-none">
+                  {slots[activeIndex].label}
+                </span>
+              </div>
+            </div>
+          </div>
           {TAB_BAR_ITEMS.map((item) => {
             const Icon = TAB_ICONS[item.key];
             const active = current === item.key;
@@ -131,13 +184,16 @@ export function MobileNav({
                 onClick={() => onNavigate(item.key)}
                 aria-current={active ? 'page' : undefined}
                 aria-label={item.label}
-                className={cn(
-                  'flex min-h-[52px] min-w-[52px] flex-1 flex-col items-center justify-center gap-0.5 rounded-full px-1 py-1.5 text-[10px] leading-none transition-colors',
-                  active ? 'bg-accent/10 font-medium text-accent' : 'text-muted',
-                )}
+                className="liquid-glass-press flex min-h-[52px] min-w-[52px] flex-1 items-center justify-center rounded-full px-1 py-1.5 text-muted"
               >
-                <Icon size={22} strokeWidth={active ? 2.25 : 2} aria-hidden="true" />
-                {active ? item.label : null}
+                {/* The active button's own icon fades out — the
+                    indicator above carries the visible one. */}
+                <Icon
+                  size={22}
+                  strokeWidth={2}
+                  aria-hidden="true"
+                  className={cn('transition-opacity duration-200', active && 'opacity-0')}
+                />
               </button>
             );
           })}
@@ -148,13 +204,14 @@ export function MobileNav({
             aria-expanded={moreOpen}
             aria-current={moreActive ? 'page' : undefined}
             aria-label="More sections"
-            className={cn(
-              'flex min-h-[52px] min-w-[52px] flex-1 flex-col items-center justify-center gap-0.5 rounded-full px-1 py-1.5 text-[10px] leading-none transition-colors',
-              moreActive ? 'bg-accent/10 font-medium text-accent' : 'text-muted',
-            )}
+            className="liquid-glass-press flex min-h-[52px] min-w-[52px] flex-1 items-center justify-center rounded-full px-1 py-1.5 text-muted"
           >
-            <Ellipsis size={22} strokeWidth={moreActive ? 2.25 : 2} aria-hidden="true" />
-            {moreActive ? 'More' : null}
+            <Ellipsis
+              size={22}
+              strokeWidth={2}
+              aria-hidden="true"
+              className={cn('transition-opacity duration-200', moreActive && 'opacity-0')}
+            />
           </button>
         </div>
       </nav>

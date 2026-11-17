@@ -146,6 +146,90 @@
   stroke-dashoffset: 0;
 }
 
+/* Liquid glass pill nav (v0.13.2): the owner rejected the flat
+   v0.13.1 pill — real Apple liquid glass is a material with depth
+   and movement, not just a translucent panel. The layers:
+   - the pill itself: translucent white (65%) + strong blur and
+     saturation, a hairline border, a bright inset top highlight
+     (the specular rim where light hits), a soft inner bottom
+     shadow for depth, and one soft drop shadow underneath.
+   - the active indicator: a glassy blue pill-within-a-pill
+     (translucent accent + blur + its own inner top highlight)
+     that GLIDES between slots on a springy transform transition.
+   - a slow sheen: a soft blurred white shape drifting across the
+     pill so the glass feels alive even when nobody taps.
+   No gradients anywhere — the light comes from blurred shapes
+   and inset shadows, not gradient backgrounds. Reduced motion:
+   static glass, static highlight, no sheen, no press morph. */
+.liquid-glass-nav {
+  background-color: rgba(255, 255, 255, 0.65);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  backdrop-filter: blur(24px) saturate(1.8);
+  border: 1px solid rgba(229, 229, 229, 0.9);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(17, 17, 17, 0.05),
+    0 12px 32px rgba(17, 17, 17, 0.14);
+}
+.liquid-glass-indicator {
+  background-color: rgba(0, 113, 227, 0.16);
+  -webkit-backdrop-filter: blur(12px) saturate(1.6);
+  backdrop-filter: blur(12px) saturate(1.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -1px 0 rgba(0, 113, 227, 0.14),
+    0 1px 4px rgba(0, 113, 227, 0.12);
+  color: #0071e3;
+}
+.liquid-glass-glide {
+  transition: transform 450ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform;
+}
+@keyframes liquid-sheen-drift {
+  0% {
+    transform: translateX(-140px) rotate(18deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.5;
+  }
+  55% {
+    transform: translateX(480px) rotate(18deg);
+    opacity: 0.5;
+  }
+  70%,
+  100% {
+    transform: translateX(480px) rotate(18deg);
+    opacity: 0;
+  }
+}
+.liquid-glass-sheen {
+  filter: blur(18px);
+  opacity: 0;
+  animation: liquid-sheen-drift 7s ease-in-out infinite;
+}
+@keyframes liquid-indicator-content-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.liquid-indicator-content {
+  animation: liquid-indicator-content-in 220ms ease-out;
+}
+.liquid-glass-press {
+  transition:
+    transform 150ms ease,
+    color 150ms ease;
+}
+.liquid-glass-press:active {
+  transform: scale(0.93);
+}
+
 /* Mobile foundation (v0.13.0): Apple-level phone rules.
    Everything here lives under 768px, so desktop is untouched.
    - 44pt minimum touch targets on every button and form control
@@ -210,6 +294,22 @@
   }
   .selfie-ring-fill {
     stroke-dashoffset: 0;
+  }
+  .liquid-glass-glide {
+    transition: none;
+  }
+  .liquid-glass-sheen {
+    animation: none;
+    opacity: 0;
+  }
+  .liquid-indicator-content {
+    animation: none;
+  }
+  .liquid-glass-press {
+    transition: none;
+  }
+  .liquid-glass-press:active {
+    transform: none;
   }
   .splash-ring,
   .splash-tail {

@@ -40,3 +40,15 @@ export function isTabBarKey(key: NavKey): boolean {
 export function isMoreNavKey(key: NavKey): boolean {
   return MORE_SHEET_ITEMS.some((item) => item.key === key);
 }
+
+/**
+ * Slot index of the section that is active in the mobile pill
+ * (v0.13.2): 0–3 for the four tabs, 4 for anything behind the
+ * "More" tab. The gliding active indicator is positioned from
+ * this index alone — one slot per step, driven by a transform,
+ * so the pill glides instead of jumping.
+ */
+export function mobileNavActiveIndex(current: NavKey): number {
+  const tabIndex = TAB_BAR_ITEMS.findIndex((item) => item.key === current);
+  return tabIndex === -1 ? TAB_BAR_ITEMS.length : tabIndex;
+}

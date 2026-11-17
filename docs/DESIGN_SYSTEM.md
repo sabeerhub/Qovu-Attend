@@ -11,10 +11,10 @@ Explicitly forbidden in this product:
 
 - Gradients of any kind (especially purple/blue gradient blobs).
 - Glassmorphism, frosted panels, heavy shadows, glow effects —
-  with ONE owner-approved exception (v0.13.1): the mobile pill
-  navigation below is frosted white with a backdrop blur, because
-  the owner asked for exactly that Apple Liquid Glass look. The
-  blur lives only in that one pill; nothing else frosts.
+  with ONE owner-approved exception (v0.13.1, deepened in
+  v0.13.2): the mobile pill navigation below is real Apple
+  liquid glass, because the owner asked for exactly that look.
+  The glass lives only in that one pill; nothing else frosts.
 - Oversized decorative icons, illustration packs, emoji in the UI.
 - Cluttered dashboards, stat-card walls, unnecessary animation.
 - More than one accent color, and the accent used for decoration
@@ -80,19 +80,27 @@ internal padding.
 - **Sidebar (desktop):** 240px, `#f5f5f7` background, 15px nav items,
   active item is `#111111` text with a white pill background — not a
   colored bar.
-- **Mobile (v0.13.1):** a floating frosted-white pill tab bar
-  (Apple Liquid Glass, in our colors): centred, floating 16px
-  above the safe area, fully rounded, translucent white
-  (`bg-surface/80`) + backdrop blur + 1px `#e5e5e5` hairline +
-  one soft shadow — the ONLY frosted surface in the product, an
-  owner-approved exception to the no-glassmorphism rule. Four
-  tabs (Overview, Courses, Sessions, History) plus a "More" tab
-  that opens a bottom sheet with the remaining sections; the
-  sheet also carries a Sign out row (log-out icon + label, danger
-  color). Active tab: accent-blue icon + small label inside a
-  soft rounded highlight (`bg-accent/10`); inactive tabs: ink
-  icon only, with the section name as the button's aria-label
-  (screen readers still hear it). No gradients, no dark pill.
+- **Mobile (v0.13.2):** real Apple liquid glass in our colors —
+  a floating pill tab bar, centred, floating 16px above the safe
+  area, fully rounded. The material is layered, not flat:
+  translucent white (65%) + strong blur and saturation, a
+  hairline border, a bright inset top highlight (the specular
+  rim), a soft inner bottom shadow for depth, and one soft drop
+  shadow underneath; a slow sheen (a soft blurred white shape)
+  drifts across the pill on a 7s loop. The active item is a
+  glassy blue pill-within-a-pill that GLIDES slot to slot on a
+  springy 450ms transform transition, carrying the active icon +
+  label with it; a tap squashes the pressed item slightly
+  (~150ms press morph). Reduced motion: static glass, static
+  highlight, no sheen, no press morph. Four tabs (Overview,
+  Courses, Sessions, History) plus a "More" tab that opens a
+  bottom sheet with the remaining sections; the sheet also
+  carries a Sign out row (log-out icon + label, danger color).
+  Active tab: accent-blue icon + small label inside the gliding
+  glass pill; inactive tabs: ink icon only, with the section name
+  as the button's aria-label (screen readers still hear it). No
+  gradients, no dark pill. The glass lives only in this pill —
+  the owner-approved exception to the no-glassmorphism rule.
   Phone rules (v0.13.0): 44pt minimum touch targets, primary
   actions full-width and thumb-friendly at the bottom of the
   screen, safe-area insets respected (notch / home indicator —

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isMoreNavKey,
   isTabBarKey,
+  mobileNavActiveIndex,
   MORE_SHEET_ITEMS,
   TAB_BAR_ITEMS,
 } from '@/lib/navigation';
@@ -55,6 +56,29 @@ describe('mobile navigation grouping', () => {
     for (const key of MORE_SHEET_ITEMS.map((item) => item.key)) {
       expect(isMoreNavKey(key)).toBe(true);
       expect(isTabBarKey(key)).toBe(false);
+    }
+  });
+});
+
+describe('mobileNavActiveIndex (v0.13.2 gliding indicator)', () => {
+  it('returns the tab slot for the four tabs, in bar order', () => {
+    expect(mobileNavActiveIndex('overview')).toBe(0);
+    expect(mobileNavActiveIndex('courses')).toBe(1);
+    expect(mobileNavActiveIndex('sessions')).toBe(2);
+    expect(mobileNavActiveIndex('history')).toBe(3);
+  });
+
+  it('returns the More slot (4) for every section behind More', () => {
+    for (const key of MORE_SHEET_ITEMS.map((item) => item.key)) {
+      expect(mobileNavActiveIndex(key)).toBe(4);
+    }
+  });
+
+  it('never returns an out-of-range slot for any section', () => {
+    for (const key of ALL_KEYS) {
+      const index = mobileNavActiveIndex(key);
+      expect(index).toBeGreaterThanOrEqual(0);
+      expect(index).toBeLessThanOrEqual(4);
     }
   });
 });
