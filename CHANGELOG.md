@@ -1,5 +1,14 @@
 # Changelog — UniAttend
 
+## v0.12.1 — 2026-11-17 — Live selfie step rebuilt: circular face frame, animated ring (owner request)
+
+- **The selfie step now looks like the Sumsub liveness screen the owner sent — Apple-standard premium.** A clean white card, the live camera inside a CIRCLE (the face frame), an animated dashed ring around it, and short guidance below it: "Look straight into the camera". The ring is hand-built inline SVG (no image assets, no new dependency, CSS/SVG animation only): a faint dotted track, accent-blue dashes that slowly rotate while the camera is live, and a solid arc that progressively fills the ring; when the photo is taken the ring is complete. The ring is Qovu accent blue `#0071e3` — NOT the green from the screenshot (one accent only, per the design system). Reduced motion shows a static complete ring. New: `FaceFrame` inside `src/features/submission/SelfieStep.tsx`; ring keyframes in `src/styles/globals.css`.
+- **All states in the same premium style:** camera starting ("Starting camera…"), camera active (animated ring + "Look straight into the camera" + Take photo), captured (photo shown inside the circle, ring complete, "Use this photo" + "Retake"), camera denied/missing (the existing plain message: "You need a front camera to submit your attendance. If your phone has no front camera, go to your lecturer — they will add you by hand." + "Try the camera again"). Phone-first layout: the frame is centred, buttons are full-width tap targets, text is readable at 13–17px.
+- **The check itself is UNCHANGED — only the look.** The selfie is still compulsory (no Skip), capture + 8x8 average hash + submit payload are exactly as before, and the server still refuses a submission without a selfie. We did NOT integrate Sumsub or any paid liveness/deepfake service — only the presentation changed.
+- **No migration, no server change.** The new code goes live with the web deploy only.
+- **Tests:** 406 passing (was 406), 38 files — no logic changed, so no new tests; the existing selfie tests stay green.
+- **Not verified live.** No real camera in this environment — the animation and layout are verified by build + bundle text + CSS review only, not by a real phone; the owner will see the real thing on his phone.
+
 ## v0.12.0 — 2026-11-17 — Mark all as arrived: one tap marks the whole hall
 
 - **One tap marks every student on the class list as arrived.** The lecturer counts everyone in the hall and has no time to add students one by one — a "Mark all as arrived" button in the session workspace (next to the manual-add form, same session-state rule as a single manual add: only finalized/archived sessions refuse it). It only appears when the course has a class list; with no list the screen says plainly "Add the class list first — there is nobody to mark."

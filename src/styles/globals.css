@@ -112,6 +112,40 @@
   transform: translateY(0);
 }
 
+/* Selfie face frame (v0.12.1): the dashed ring around the
+   circular camera preview slowly rotates while the camera is live,
+   and a solid arc progressively fills the ring (circumference
+   2π×95 ≈ 597). When the photo is taken the ring is complete.
+   Calm, one easing, no bounce — and reduced motion shows a static
+   complete ring, so the frame never depends on the animation. */
+@keyframes selfie-ring-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes selfie-ring-fill {
+  from {
+    stroke-dashoffset: 597;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.selfie-ring-spin {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: selfie-ring-spin 16s linear infinite;
+}
+.selfie-ring-fill {
+  stroke-dasharray: 597;
+  stroke-dashoffset: 597;
+  animation: selfie-ring-fill 3s ease-out forwards;
+}
+.selfie-ring-complete {
+  stroke-dasharray: 597;
+  stroke-dashoffset: 0;
+}
+
 /* Skeleton loading (v0.7.0): neutral grey blocks in the shape of
    the content that is coming, with a calm opacity pulse. */
 .skeleton {
@@ -141,8 +175,13 @@
   .splash-dot,
   .splash-word,
   .splash-skip,
-  .skeleton {
+  .skeleton,
+  .selfie-ring-spin,
+  .selfie-ring-fill {
     animation: none;
+  }
+  .selfie-ring-fill {
+    stroke-dashoffset: 0;
   }
   .splash-ring,
   .splash-tail {
