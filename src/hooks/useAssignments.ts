@@ -125,7 +125,7 @@ export function useAssignments(refreshKey = 0): AssignmentsState {
             ? supabase
                 .from('courses')
                 .select(
-                  'id, department_id, semester_id, code, title, level, credit_unit, created_at, ' +
+                  'id, department_id, semester_id, code, title, level, credit_unit, eligibility_threshold, created_at, ' +
                     'departments(name), ' +
                     'semesters(name, start_date, end_date, academic_session_id, academic_sessions(name, start_date, end_date))',
                 )

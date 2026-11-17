@@ -62,6 +62,7 @@ function makeCourse(semester: AssignedCourse['semester']): AssignedCourse {
     title: 'Web Technology',
     level: 200,
     credit_unit: 3,
+    eligibility_threshold: 75,
     created_at: '2026-11-17T00:00:00Z',
     departmentName: 'Information Technology',
     semesterName: 'First Semester',

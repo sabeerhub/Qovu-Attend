@@ -208,6 +208,44 @@ must be recorded in the audit log. Any transition to `active`
 - Manual attendance by the lecturer is not roster-checked: the
   lecturer is in the hall and authorizes it with a reason.
 
+## Eligibility — the 75% check (v0.11.0 — implemented, untested live)
+
+- For each course, every student gets an attendance percentage:
+  sessions attended divided by sessions actually held.
+- **The bar is 75% by default.** The lecturer can change it for a
+  course (a whole number from 0 to 100), saved through the
+  server-side `set_eligibility_threshold` RPC, which refuses any
+  course the lecturer is not assigned to. The range is also
+  enforced by a database CHECK constraint.
+- **What counts as "held":** only a session that is finished and
+  locked — Finalized or Archived. Draft, Active and Closed
+  sessions do not count yet, because attendance can still change
+  in them. There is no cancelled session status in this codebase,
+  so there is nothing extra to exclude.
+- **What counts as "attended":** a record with status `verified`
+  or `manual`. A student added by hand by the lecturer counts as
+  present, the same as a verified one. `pending`, `rejected` and
+  `suspicious` do not count as present.
+- **The exact percentage decides, not the rounded one:** 74.6% is
+  below a 75% bar. The displayed number is rounded to one decimal
+  for reading only.
+- **Risk bands (they move with the bar):** below the bar; close to
+  the bar — from the bar up to 9 points above it (so 75–84% when
+  the bar is 75%); safe — 10 or more points above the bar.
+  Students below the bar are not eligible to write the exam.
+- **Week view (W1–W15):** for each week, a student shows attended
+  when they were present in at least one finished session that
+  week, missed when there were finished sessions that week and
+  they were present in none, and no session when the week had no
+  finished sessions. The attended/held counts stay per session.
+- **Who gets a row:** every student on the course's class list
+  (a student with no records shows 0%), plus any registration
+  number that has records but is not on the list (courses without
+  a list). The percentage is computed, never stored — a stored
+  percentage would go stale the moment a session is finalized.
+- **No finished sessions yet:** eligibility appears after the
+  first session is finalized. Until then the view says so plainly.
+
 ## Headcount vs. submissions
 
 - During an active session the dashboard shows physical headcount,

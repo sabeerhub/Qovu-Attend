@@ -89,8 +89,22 @@ Teaching permissions. A lecturer sees only what is assigned here.
 | title | text, not null | |
 | level | integer, not null | e.g. 300 |
 | credit_unit | integer | nullable where not applicable |
+| eligibility_threshold | integer, not null, default 75 | **Eligibility (v0.11.0):** the attendance bar for this course, in percent. Check 0–100. Changed only through the `set_eligibility_threshold` RPC (see below); there is no direct client update policy on courses. |
 | created_at | timestamptz, default now() | |
 | unique (department_id, code, semester_id) | | Same code, different semester is allowed |
+
+### set_eligibility_threshold (RPC, v0.11.0)
+
+`set_eligibility_threshold(p_course_id, p_threshold) returns
+integer` — `SECURITY DEFINER`, executable by `authenticated`
+only. Resolves the caller's lecturer profile from `auth.uid()`
+(error if none); validates the threshold is a whole number 0–100;
+refuses any course the caller is not assigned to (course-level
+assignment, or department-level assignment with a null
+`course_id`); updates the course's `eligibility_threshold` and
+returns the saved value. The range is also enforced by the
+`courses_eligibility_threshold_range` CHECK constraint. See
+`docs/API_CONTRACTS.md`.
 
 ### create_lecturer_course (RPC, v0.4.0)
 

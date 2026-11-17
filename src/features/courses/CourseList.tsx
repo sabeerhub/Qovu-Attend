@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAssignments, type AssignedCourse } from '@/hooks/useAssignments';
 import { CourseForm } from './CourseForm';
 import { CourseStudents } from '@/features/students/CourseStudents';
+import { CourseEligibility } from '@/features/eligibility/CourseEligibility';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState, ErrorState } from '@/components/ui/empty-state';
@@ -23,9 +24,11 @@ export function CourseList() {
   const state = useAssignments(refreshKey);
   const [departmentFilter, setDepartmentFilter] = useState<string>('');
   const [showForm, setShowForm] = useState(false);
-  // A course's Students view (v0.9.0): the class list lives inside
-  // its course — there is no separate top-level nav item for it.
+  // A course's Students view (v0.9.0) and Eligibility view (v0.11.0):
+  // the class list and the 75% check live inside their course —
+  // there is no separate top-level nav item for either.
   const [selectedCourse, setSelectedCourse] = useState<AssignedCourse | null>(null);
+  const [selectedView, setSelectedView] = useState<'students' | 'eligibility'>('students');
 
   if (state.status === 'not-configured') {
     return (
@@ -49,6 +52,14 @@ export function CourseList() {
   const { departments, courses } = state.data;
 
   if (selectedCourse) {
+    if (selectedView === 'eligibility') {
+      return (
+        <CourseEligibility
+          course={selectedCourse}
+          onBack={() => setSelectedCourse(null)}
+        />
+      );
+    }
     return (
       <CourseStudents
         course={selectedCourse}
@@ -131,13 +142,26 @@ export function CourseList() {
                         : ''}
                       {` · ${course.academicSessionName}`}
                     </p>
-                    <div className="mt-3">
+                    <div className="mt-3 flex flex-wrap gap-2">
                       <Button
                         type="button"
                         variant="secondary"
-                        onClick={() => setSelectedCourse(course)}
+                        onClick={() => {
+                          setSelectedView('students');
+                          setSelectedCourse(course);
+                        }}
                       >
                         Students
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => {
+                          setSelectedView('eligibility');
+                          setSelectedCourse(course);
+                        }}
+                      >
+                        Eligibility
                       </Button>
                     </div>
                   </CardContent>

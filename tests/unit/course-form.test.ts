@@ -30,6 +30,7 @@ const createdCourse: Course = {
   title: 'Web Technology',
   level: 300,
   credit_unit: 3,
+  eligibility_threshold: 75,
   created_at: '2026-11-16T00:00:00.000Z',
 };
 

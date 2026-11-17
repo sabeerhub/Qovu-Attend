@@ -74,6 +74,13 @@ export interface Course {
   title: string;
   level: number;
   credit_unit: number | null;
+  /**
+   * Eligibility (v0.11.0): the attendance bar for this course, in
+   * percent. Default 75; the lecturer changes it per course through
+   * the `set_eligibility_threshold` RPC. Range 0–100, enforced by
+   * a database CHECK constraint.
+   */
+  eligibility_threshold: number;
   created_at: string;
 }
 
