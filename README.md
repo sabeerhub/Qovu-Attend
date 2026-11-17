@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.13.3-0071e3" alt="Version 0.13.3">
+  <img src="https://img.shields.io/badge/version-0.14.0-0071e3" alt="Version 0.14.0">
   <img src="https://img.shields.io/badge/React-18-111111" alt="React 18">
   <img src="https://img.shields.io/badge/TypeScript-strict-111111" alt="TypeScript strict">
   <img src="https://img.shields.io/badge/Supabase-Postgres-111111" alt="Supabase Postgres">
@@ -31,7 +31,8 @@ Qovu is lecturer attendance that verifies who is really in the hall. A lecturer 
 - **Eligibility — the 75% check.** Attendance % per student per course, counted from sessions actually held. The bar is 75% by default and the lecturer can change it per course, with a week-by-week (W1–W15) view.
 - **Mark all as arrived.** One tap marks the whole class list present, skipping anyone who already submitted, with a confirm step first.
 - **My Lecture Plan.** A weekly timetable (Monday–Saturday). One tap turns a planned lecture into a live session.
-- **Apple-minimal design.** Quiet white interface, one accent blue, and a liquid-glass pill navigation on phones.
+- **Exports — PDF + CSV.** One session or a whole course: the spreadsheet keeps every session's detail (registration number, status, method, time, reason), and the printed report is the A4 summary with the session list, per-student attended/held/%, and a signature area. Only your own assigned records, ever.
+- **History.** Every session stays available, filterable by department, course, status and date — open any session to see its detail and export it.
 - **Contact reports by email.** The contact form sends a report straight to the owner's inbox.
 
 ## How it works
@@ -46,11 +47,11 @@ React + Vite, TypeScript (strict), Tailwind CSS, Supabase (PostgreSQL, Auth, Edg
 
 ## Status
 
-Live at [qovu.vercel.app](https://qovu.vercel.app) — **v0.13.3**.
+Live at [qovu.vercel.app](https://qovu.vercel.app) — **v0.14.0**.
 
 Version history lives in [CHANGELOG.md](CHANGELOG.md).
 
-Not yet: PDF/CSV exports are next. A real hall test is in progress.
+Not yet: a real hall test is in progress.
 
 ## Quick start
 

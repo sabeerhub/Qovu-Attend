@@ -173,10 +173,15 @@ nothing. Do not treat them as verified until that test has run.
 
 ## Exports
 
-- PDF and CSV exports (Phase 3) must run with the same permission
+- PDF and CSV exports (built v0.14.0) run with the same permission
   checks as the UI: a lecturer exports only their authorized records.
+  The checks are Postgres RLS (own `lecturer_id`, own assignments),
+  not browser code — a raw API call cannot read another lecturer's
+  rows either. No Edge Function is used for exports.
 - CSV values must be escaped (see `lib/csv.ts` and its tests) to
-  prevent formula injection (`=`, `+`, `-`, `@` at cell start).
+  prevent formula injection (`=`, `+`, `-`, `@`, leading tab or
+  carriage return at cell start), and the file starts with a UTF-8
+  BOM so Excel opens it as UTF-8.
 
 ## Secrets
 

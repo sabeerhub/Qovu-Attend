@@ -325,3 +325,60 @@
     visibility: hidden;
   }
 }
+
+/* Printable reports (v0.14.0): the report lives in a
+   `.print-report` node that is hidden on screen and is the only
+   thing printed. A4, repeated table headers on multi-page
+   reports, a footer with page numbers on every page, and a
+   signature area at the end. No PDF library: the lecturer prints
+   or saves as PDF from the browser. Page numbers come from the
+   print engine's counter(page) — Chrome and Edge show them;
+   other browsers show the footer without the numbers. */
+.print-report {
+  display: none;
+}
+@media print {
+  @page {
+    size: A4;
+    margin: 16mm 14mm 18mm;
+  }
+  body * {
+    visibility: hidden;
+  }
+  .print-report,
+  .print-report * {
+    visibility: visible;
+  }
+  .print-report {
+    display: block;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    padding-bottom: 16mm;
+    color: #111111;
+    background: #ffffff;
+  }
+  .print-report thead {
+    display: table-header-group;
+  }
+  .print-report tr {
+    break-inside: avoid;
+  }
+  .print-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #6e6e73;
+  }
+  .print-page-number::after {
+    content: 'Page ' counter(page) ' of ' counter(pages);
+  }
+  .print-signature-line {
+    border-bottom: 1px solid #111111;
+    height: 28px;
+  }
+}

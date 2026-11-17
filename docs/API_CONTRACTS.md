@@ -517,14 +517,17 @@ unreachable, errors, or the email fails, the report stays saved and
 the user still sees the normal success message — the email must
 never fail the report. The outcome is only logged to the console.
 
-## Edge Functions (Phase 3, planned — not implemented)
+## Edge Functions (Phase 3 exports — built client-side instead, v0.14.0)
+
+No `export-report` function exists, deliberately: exports are built
+client-side from the same RLS-scoped queries as the UI, and Postgres
+RLS (own `lecturer_id`, own assignments) is the server-side
+enforcement — a raw API call cannot read another lecturer's rows.
+Do not call an endpoint that does not exist.
 
 | Function | Purpose |
 |---|---|
-| `export-report` | Generate PDF / CSV scoped to the lecturer's authorized records. |
-
-No export function exists yet in `supabase/functions/`. Do not call
-an endpoint that does not exist.
+| _(none)_ | Exports need no function. |
 
 ## Errors
 
@@ -539,11 +542,12 @@ an endpoint that does not exist.
 - Validation failure (e.g. week outside 1–15): rejected before any
   network call, with a field-level message.
 
-## CSV contract (Phase 3)
+## CSV contract (Phase 3 — built v0.14.0, see `lib/exports.ts`)
 
 Columns, in order: registration number, student name (if available
 and authorized), department, course code, academic session, semester,
 week, attendance title, lecture date, attendance status,
 verification method, submission timestamp, manual attendance reason
 (if applicable). Values are escaped per RFC 4180 and formula
-injection is neutralized (see `lib/csv.ts`).
+injection is neutralized (see `lib/csv.ts`). The file starts with a
+UTF-8 BOM so Excel opens it as UTF-8.

@@ -5,17 +5,17 @@
 - React + Vite, TypeScript (strict)
 - Tailwind CSS + shadcn/ui
 - Supabase PostgreSQL, Supabase Auth, Supabase Edge Functions
-- Cloudflare Pages (hosting)
+- Vercel (hosting)
 - `qrcode` (QR generation), `html5-qrcode` (scanning) — Phase 2
 - Browser Geolocation API — Phase 4
-- Browser print styles + a PDF-generation library — Phase 3
-- CSV export, client-side or server-side — Phase 3
+- Browser print styles for the PDF report — built v0.14.0, no PDF library
+- CSV export, client-side — built v0.14.0
 - Free tier only, within published quotas.
 
 ## High-level shape
 
 ```
-Lecturer browser (React SPA, Cloudflare Pages)
+Lecturer browser (React SPA, Vercel)
         │  HTTPS, anon key only
         ▼
 Supabase Auth ──► Supabase PostgreSQL (RLS on)
@@ -71,9 +71,12 @@ Rules from the constitution:
 - Phase 2: Edge Function issues a short-lived QR token, validates
   expiry server-side, enforces uniqueness and rate limits on
   submissions, and records manual attendance with a reason + audit row.
-- Phase 3: history reads and PDF/CSV exports run server-side (or
-  through an Edge Function) so permission checks cannot be bypassed
-  in the browser.
+- Phase 3: history reads and PDF/CSV exports are client-side, built
+  v0.14.0. The permission check is not in the browser: every export
+  query runs through Postgres RLS (own `lecturer_id`, own assignments),
+  so even a raw API call cannot read another lecturer's rows. No Edge
+  Function is needed for exports — there is no unguarded path for the
+  data to leave through.
 - Phase 4: GPS/passcode verification, risk indicators; facial liveness
   only after a privacy and feasibility review.
 

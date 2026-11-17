@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { escapeCsvValue, toCsv, toCsvRow } from '@/lib/csv';
+import { escapeCsvValue, toCsv, toCsvRow, toCsvWithBom } from '@/lib/csv';
 
 describe('CSV escaping', () => {
   it('leaves plain values untouched', () => {
@@ -25,6 +25,21 @@ describe('CSV escaping', () => {
     expect(escapeCsvValue('@SUM(A1:A2)')).toBe("'@SUM(A1:A2)");
     // A formula character later in the value is not a formula.
     expect(escapeCsvValue('grade = A')).toBe('grade = A');
+  });
+
+  it('neutralizes a leading tab or carriage return (v0.14.0)', () => {
+    // Some spreadsheet apps strip leading whitespace and then read
+    // the next character as a formula trigger, so the tab / CR
+    // itself must be neutralized.
+    expect(escapeCsvValue('\t=1+1')).toBe("'\t=1+1");
+    // A carriage return also forces RFC 4180 quoting around the
+    // whole cell — the leading quote still neutralizes the formula.
+    expect(escapeCsvValue('\r=1+1')).toBe('"\'\r=1+1"');
+    expect(escapeCsvValue('\tplain')).toBe("'\tplain");
+  });
+
+  it('prepends a UTF-8 BOM (v0.14.0)', () => {
+    expect(toCsvWithBom(['a'], [['b']])).toBe('\uFEFFa\r\nb');
   });
 
   it('builds rows and a full CSV document', () => {

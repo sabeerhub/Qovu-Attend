@@ -112,6 +112,12 @@ internal padding.
   an icon + "Sign out" full-width row on the Profile screen. It
   signs out immediately — there is no confirmation step.
 - **Status:** a 6px dot + label text.
+- **Print reports (v0.14.0):** the PDF is a print view, not a file —
+  a `.print-report` node hidden on screen, the only thing printed.
+  A4 `@page`, repeated table headers, a footer with page numbers,
+  a signature area at the end. Same colors and type as the screen;
+  no PDF library. Page numbers come from the print engine
+  (`counter(page)`) — Chrome and Edge show them.
 
 ## States (every screen must handle all four)
 

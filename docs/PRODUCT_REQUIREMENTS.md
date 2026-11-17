@@ -102,7 +102,7 @@ lecturer(s).
 - Every manual entry and correction records lecturer, timestamp, reason
   and previous/new status.
 
-### Attendance history (Phase 3)
+### Attendance history (Phase 3 — built v0.14.0)
 
 - Permanent core feature. Lecturers can revisit completed sessions at
   any time within their authorized access.
@@ -114,7 +114,12 @@ lecturer(s).
   verification details where permitted, and audit history.
 - Finalized historical records cannot be silently rewritten.
 
-### Reports and exports (Phase 3)
+Built in v0.14.0 with department, course, status and date-range
+filters; opening a session shows the session monitor (counts,
+records, manual attendance, lifecycle, exports). Semester, week
+and title filters and an audit-history view are not built yet.
+
+### Reports and exports (Phase 3 — built v0.14.0)
 
 - PDF: clean printable A4 report — university name/logo, faculty and
   department, course code/title, session/semester, week, title, date and
@@ -131,6 +136,13 @@ lecturer(s).
   authorized records.
 - Exports respect lecturer permissions and never expose another
   lecturer's records without authorization.
+
+Built in v0.14.0 for two scopes — one session, and all sessions for a
+course — as a printable A4 report (browser print, no PDF library) and
+a formula-safe CSV with a UTF-8 BOM. Week, semester and department
+scopes are not built yet. The report header has no university name or
+logo: none is configured in Qovu, and nothing is invented — a
+university name/logo setting is still an open question for the owner.
 
 ## Non-functional requirements
 

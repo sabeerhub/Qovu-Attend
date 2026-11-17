@@ -3,6 +3,7 @@ import { useAssignments, type AssignedCourse } from '@/hooks/useAssignments';
 import { CourseForm } from './CourseForm';
 import { CourseStudents } from '@/features/students/CourseStudents';
 import { CourseEligibility } from '@/features/eligibility/CourseEligibility';
+import { CourseExport } from '@/features/reports/CourseExport';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState, ErrorState } from '@/components/ui/empty-state';
@@ -24,11 +25,12 @@ export function CourseList() {
   const state = useAssignments(refreshKey);
   const [departmentFilter, setDepartmentFilter] = useState<string>('');
   const [showForm, setShowForm] = useState(false);
-  // A course's Students view (v0.9.0) and Eligibility view (v0.11.0):
-  // the class list and the 75% check live inside their course —
-  // there is no separate top-level nav item for either.
+  // A course's Students view (v0.9.0), Eligibility view (v0.11.0)
+  // and Exports view (v0.14.0): the class list, the 75% check and
+  // the exports live inside their course — there is no separate
+  // top-level nav item for any of them.
   const [selectedCourse, setSelectedCourse] = useState<AssignedCourse | null>(null);
-  const [selectedView, setSelectedView] = useState<'students' | 'eligibility'>('students');
+  const [selectedView, setSelectedView] = useState<'students' | 'eligibility' | 'exports'>('students');
 
   if (state.status === 'not-configured') {
     return (
@@ -49,13 +51,22 @@ export function CourseList() {
     );
   }
 
-  const { departments, courses } = state.data;
+  const { departments, courses, profile } = state.data;
 
   if (selectedCourse) {
     if (selectedView === 'eligibility') {
       return (
         <CourseEligibility
           course={selectedCourse}
+          onBack={() => setSelectedCourse(null)}
+        />
+      );
+    }
+    if (selectedView === 'exports') {
+      return (
+        <CourseExport
+          course={selectedCourse}
+          lecturerName={profile.full_name}
           onBack={() => setSelectedCourse(null)}
         />
       );
@@ -162,6 +173,16 @@ export function CourseList() {
                         }}
                       >
                         Eligibility
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => {
+                          setSelectedView('exports');
+                          setSelectedCourse(course);
+                        }}
+                      >
+                        Exports
                       </Button>
                     </div>
                   </CardContent>

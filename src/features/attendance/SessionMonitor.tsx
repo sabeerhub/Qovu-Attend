@@ -13,6 +13,7 @@ import {
 import { correctRecord, manualAdd, reviewFace, transitionSession } from '@/lib/edgeFunctions';
 import { BulkMarkAll } from './BulkMarkAll';
 import { QrDisplay } from './QrDisplay';
+import { SessionExport } from '@/features/reports/SessionExport';
 import { LocationAllowPanel, LocationBlockedPanel } from '@/components/ui/location-permission';
 import { StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -790,6 +791,14 @@ export function SessionMonitor({
               );
             })()
           : null}
+      </section>
+
+      <section>
+        <h3 className="mb-4 text-[17px] font-semibold text-ink">Export</h3>
+        <SessionExport
+          session={session}
+          records={recordsState.status === 'ready' ? recordsState.records : null}
+        />
       </section>
 
       {editable ? (
