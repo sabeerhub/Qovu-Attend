@@ -101,17 +101,17 @@ export function DepartmentWorkspace({
       {state.status === 'error' ? <ErrorState message={state.message} /> : null}
       {state.status === 'ready' ? (
         <>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-3 md:gap-4">
             {[
               { label: 'Assigned courses', value: courses.length },
               { label: 'Attendance sessions', value: state.sessions.length },
               { label: 'Attendance records', value: state.recordCount },
             ].map((item) => (
               <Card key={item.label}>
-                <CardHeader>
+                <CardHeader className="px-4 pt-4 sm:px-6 sm:pt-5">
                   <CardTitle className="text-[13px] font-normal text-muted">{item.label}</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-4 pb-4 pt-0 sm:px-6 sm:py-5">
                   <p className="text-[28px] font-semibold leading-none text-ink">{item.value}</p>
                 </CardContent>
               </Card>
@@ -154,30 +154,54 @@ export function DepartmentWorkspace({
                   No attendance sessions in this department yet.
                 </p>
               ) : (
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-line text-[12px] uppercase text-muted">
-                      <th className="py-2 pr-4 font-medium">Title</th>
-                      <th className="py-2 pr-4 font-medium">Course</th>
-                      <th className="py-2 pr-4 font-medium">Week</th>
-                      <th className="py-2 pr-4 font-medium">Date</th>
-                      <th className="py-2 font-medium">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <>
+                  {/* Phones (v0.13.0): stacked cards instead of a
+                      five-column table — title, meta and status,
+                      nothing clipped. The table stays on desktop. */}
+                  <ul className="flex flex-col divide-y divide-line md:hidden">
                     {state.sessions.map((session) => (
-                      <tr key={session.id} className="border-b border-line last:border-b-0">
-                        <td className="py-3 pr-4 text-ink">{session.title}</td>
-                        <td className="py-3 pr-4 text-muted">{session.courses?.code ?? '—'}</td>
-                        <td className="py-3 pr-4 text-muted">Week {session.week_number}</td>
-                        <td className="py-3 pr-4 text-muted">{session.lecture_date}</td>
-                        <td className="py-3">
+                      <li
+                        key={session.id}
+                        className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-[15px] font-medium text-ink">{session.title}</p>
+                          <p className="mt-0.5 text-[13px] text-muted">
+                            {session.courses?.code ?? '—'} · Week {session.week_number} ·{' '}
+                            {session.lecture_date}
+                          </p>
+                        </div>
+                        <span className="shrink-0">
                           <StatusBadge status={session.status} />
-                        </td>
-                      </tr>
+                        </span>
+                      </li>
                     ))}
-                  </tbody>
-                </table>
+                  </ul>
+                  <table className="hidden w-full text-left text-sm md:table">
+                    <thead>
+                      <tr className="border-b border-line text-[12px] uppercase text-muted">
+                        <th className="py-2 pr-4 font-medium">Title</th>
+                        <th className="py-2 pr-4 font-medium">Course</th>
+                        <th className="py-2 pr-4 font-medium">Week</th>
+                        <th className="py-2 pr-4 font-medium">Date</th>
+                        <th className="py-2 font-medium">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {state.sessions.map((session) => (
+                        <tr key={session.id} className="border-b border-line last:border-b-0">
+                          <td className="py-3 pr-4 text-ink">{session.title}</td>
+                          <td className="py-3 pr-4 text-muted">{session.courses?.code ?? '—'}</td>
+                          <td className="py-3 pr-4 text-muted">Week {session.week_number}</td>
+                          <td className="py-3 pr-4 text-muted">{session.lecture_date}</td>
+                          <td className="py-3">
+                            <StatusBadge status={session.status} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
               )}
             </CardContent>
           </Card>

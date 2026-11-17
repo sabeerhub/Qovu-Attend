@@ -190,7 +190,7 @@ export function BulkMarkAll({
               setResult(null);
               setConfirming(true);
             }}
-            className="self-start"
+            className="w-full sm:w-auto"
           >
             Mark all as arrived
           </Button>

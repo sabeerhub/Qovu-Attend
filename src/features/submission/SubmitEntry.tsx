@@ -119,7 +119,7 @@ export function SubmitEntry() {
             {formError}
           </p>
         ) : null}
-        <Button type="submit" className="self-start" disabled={checking}>
+        <Button type="submit" className="w-full sm:w-auto" disabled={checking}>
           {checking ? 'Checking code…' : 'Continue'}
         </Button>
       </form>

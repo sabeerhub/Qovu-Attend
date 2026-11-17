@@ -101,10 +101,10 @@ export function CourseList() {
         />
       ) : (
         <>
-          <label className="flex max-w-xs flex-col gap-1.5 text-[13px] font-medium text-ink">
+          <label className="flex w-full flex-col gap-1.5 text-[13px] font-medium text-ink sm:max-w-xs">
             Filter by department
             <select
-              className="h-9 rounded-lg border border-line bg-surface px-3 text-sm text-ink"
+              className="h-11 rounded-lg border border-line bg-surface px-3 text-base text-ink md:h-9 md:text-sm"
               value={departmentFilter}
               onChange={(e) => setDepartmentFilter(e.target.value)}
             >

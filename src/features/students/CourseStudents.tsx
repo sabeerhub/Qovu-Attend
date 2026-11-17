@@ -176,20 +176,24 @@ export function CourseStudents({
           ) : (
             <>
               <div className="flex flex-col">
-                <div className="flex gap-4 border-b border-line py-2 text-[12px] font-medium uppercase text-muted">
+                <div className="hidden gap-4 border-b border-line py-2 text-[12px] font-medium uppercase text-muted sm:flex">
                   <span className="w-1/3">Registration number</span>
                   <span className="w-1/4">Name</span>
                 </div>
                 {pageStudents.map((student) => (
                   <div
                     key={student.id}
-                    className="flex items-center gap-4 border-b border-line py-3 last:border-b-0"
+                    className="flex items-center gap-3 border-b border-line py-3 last:border-b-0"
                   >
-                    <span className="w-1/3 text-sm text-ink">{student.reg_number}</span>
-                    <span className="w-1/4 text-sm text-muted">
-                      {student.student_name ?? '—'}
-                    </span>
-                    <div className="ml-auto">
+                    <div className="min-w-0 flex-1">
+                      <span className="block truncate text-[15px] font-medium text-ink">
+                        {student.reg_number}
+                      </span>
+                      <span className="block truncate text-[13px] text-muted">
+                        {student.student_name ?? '—'}
+                      </span>
+                    </div>
+                    <div className="shrink-0">
                       {confirmDeleteId === student.id ? (
                         <span className="flex gap-2">
                           <Button
@@ -279,7 +283,12 @@ export function CourseStudents({
             </div>
             {formError ? <p className="text-[13px] text-danger">{formError}</p> : null}
             <div>
-              <Button type="button" disabled={adding} onClick={() => void addStudent()}>
+              <Button
+                type="button"
+                disabled={adding}
+                onClick={() => void addStudent()}
+                className="w-full sm:w-auto"
+              >
                 {adding ? 'Adding…' : 'Add student'}
               </Button>
             </div>

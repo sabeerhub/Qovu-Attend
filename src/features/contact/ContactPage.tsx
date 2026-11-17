@@ -196,7 +196,7 @@ export function ContactPage({ nav }: { nav: PublicPageNav }) {
               {error}
             </p>
           ) : null}
-          <Button type="submit" disabled={loading} className="mt-1 self-start">
+          <Button type="submit" disabled={loading} className="mt-1 w-full sm:w-auto">
             {loading ? 'Saving…' : 'Send report'}
           </Button>
         </form>

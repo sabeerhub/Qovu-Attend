@@ -46,10 +46,10 @@ export function Overview() {
 
   return (
     <div className="flex flex-col gap-6">
-      <label className="flex max-w-xs flex-col gap-1.5 text-[13px] font-medium text-ink">
+      <label className="flex w-full flex-col gap-1.5 text-[13px] font-medium text-ink sm:max-w-xs">
         Department
         <select
-          className="h-9 rounded-lg border border-line bg-surface px-3 text-sm text-ink"
+          className="h-11 rounded-lg border border-line bg-surface px-3 text-base text-ink md:h-9 md:text-sm"
           value={departmentFilter}
           onChange={(e) => setDepartmentFilter(e.target.value)}
         >
@@ -62,13 +62,13 @@ export function Overview() {
         </select>
       </label>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
         {items.map((item) => (
           <Card key={item.label}>
-            <CardHeader>
+            <CardHeader className="px-4 pt-4 sm:px-6 sm:pt-5">
               <CardTitle className="text-[13px] font-normal text-muted">{item.label}</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-4 pb-4 pt-0 sm:px-6 sm:py-5">
               <p className="text-[28px] font-semibold leading-none text-ink">{item.value}</p>
             </CardContent>
           </Card>

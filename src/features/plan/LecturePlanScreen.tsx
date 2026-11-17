@@ -295,7 +295,7 @@ export function LecturePlanScreen({
                         </p>
                       ) : null}
                     </div>
-                    <div className="flex shrink-0 gap-2">
+                    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                       {confirmDeleteId === plan.id ? (
                         <>
                           <Button
@@ -303,6 +303,7 @@ export function LecturePlanScreen({
                             variant="danger"
                             disabled={deletingId === plan.id}
                             onClick={() => void onDelete(plan)}
+                            className="w-full sm:w-auto"
                           >
                             {deletingId === plan.id ? 'Deleting…' : 'Yes, delete'}
                           </Button>
@@ -310,6 +311,7 @@ export function LecturePlanScreen({
                             type="button"
                             variant="secondary"
                             onClick={() => setConfirmDeleteId(null)}
+                            className="w-full sm:w-auto"
                           >
                             Cancel
                           </Button>
@@ -320,6 +322,7 @@ export function LecturePlanScreen({
                             type="button"
                             disabled={startingId === plan.id}
                             onClick={() => void onStartSession(plan)}
+                            className="w-full sm:w-auto"
                           >
                             {startingId === plan.id ? 'Starting…' : 'Start session'}
                           </Button>
@@ -331,6 +334,7 @@ export function LecturePlanScreen({
                               setShowForm(false);
                               setConfirmDeleteId(null);
                             }}
+                            className="w-full sm:w-auto"
                           >
                             Edit
                           </Button>
@@ -338,6 +342,7 @@ export function LecturePlanScreen({
                             type="button"
                             variant="secondary"
                             onClick={() => setConfirmDeleteId(plan.id)}
+                            className="w-full sm:w-auto"
                           >
                             Delete
                           </Button>

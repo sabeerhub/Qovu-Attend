@@ -152,7 +152,50 @@ export function SessionList({
           )}
         </div>
       ) : null}
-      <table className="w-full text-left text-sm">
+      {/* Phones (v0.13.0): one card per session — title, meta,
+          status and actions stacked, nothing clipped. The table
+          stays on desktop. */}
+      <ul className="flex flex-col gap-3 md:hidden">
+        {state.sessions.map((session) => (
+          <li
+            key={session.id}
+            className="rounded-xl border border-line bg-surface p-4 shadow-card"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[15px] font-medium text-ink">{session.title}</p>
+                <p className="mt-0.5 text-[13px] text-muted">
+                  {session.courses?.code ?? '—'} · Week {session.week_number} ·{' '}
+                  {session.lecture_date}
+                </p>
+              </div>
+              <span className="shrink-0">
+                <StatusBadge status={session.status} />
+              </span>
+            </div>
+            <div className="mt-3 flex gap-2">
+              {session.status === 'draft' ? (
+                <Button
+                  variant="secondary"
+                  disabled={activatingId !== null || locationGate !== null}
+                  onClick={() => void onActivate(session)}
+                  className="flex-1"
+                >
+                  {activatingId === session.id ? 'Activating…' : 'Activate'}
+                </Button>
+              ) : null}
+              <Button
+                variant="secondary"
+                onClick={() => onSelect(session, null)}
+                className="flex-1"
+              >
+                Open
+              </Button>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <table className="hidden w-full text-left text-sm md:table">
         <thead>
           <tr className="border-b border-line text-[12px] uppercase text-muted">
             <th className="py-2 pr-4 font-medium">Title</th>

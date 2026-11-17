@@ -42,9 +42,9 @@ export function LandingPage({
 
       <main className="flex-1">
         {/* Hero — one idea, huge type, the cartoon underneath */}
-        <section className="mx-auto flex w-full max-w-[1120px] flex-col items-center px-4 pb-20 pt-20 text-center md:px-6 md:pb-28 md:pt-28">
+        <section className="mx-auto flex w-full max-w-[1120px] flex-col items-center px-4 pb-16 pt-14 text-center md:px-6 md:pb-28 md:pt-28">
           <img src="/favicon.svg" alt="" aria-hidden="true" width={72} height={72} />
-          <h1 className="mt-6 max-w-[800px] text-[48px] font-semibold leading-[1.05] tracking-tight text-ink md:text-[72px]">
+          <h1 className="mt-6 max-w-[800px] text-[40px] font-semibold leading-[1.05] tracking-tight text-ink md:text-[72px]">
             Attendance, verified.
           </h1>
           <p className="mt-5 max-w-[560px] text-[17px] leading-relaxed text-muted md:text-[21px]">
@@ -52,9 +52,11 @@ export function LandingPage({
             students mark themselves present, and Qovu checks they are
             really in the room.
           </p>
-          <div className="mt-8 flex flex-wrap justify-center gap-2">
-            <Button onClick={onSignUp}>Create account</Button>
-            <Button variant="secondary" onClick={onSignIn}>
+          <div className="mt-8 flex w-full max-w-[320px] flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row sm:flex-wrap sm:justify-center sm:gap-2">
+            <Button onClick={onSignUp} className="w-full sm:w-auto">
+              Create account
+            </Button>
+            <Button variant="secondary" onClick={onSignIn} className="w-full sm:w-auto">
               Sign in
             </Button>
           </div>
@@ -66,7 +68,7 @@ export function LandingPage({
 
         {/* 1 — Show the code. Canvas, so the story breathes. */}
         <section className="bg-canvas">
-          <div className="mx-auto flex w-full max-w-[1120px] flex-col items-center px-4 py-24 text-center md:px-6 md:py-32">
+          <div className="mx-auto flex w-full max-w-[1120px] flex-col items-center px-4 py-16 text-center md:px-6 md:py-32">
             <Reveal>
               <h2 className="text-[32px] font-semibold leading-tight tracking-tight text-ink md:text-[48px]">
                 Show the code.
@@ -84,7 +86,7 @@ export function LandingPage({
 
         {/* 2 — Only the hall counts. */}
         <section>
-          <div className="mx-auto flex w-full max-w-[1120px] flex-col items-center px-4 py-24 text-center md:px-6 md:py-32">
+          <div className="mx-auto flex w-full max-w-[1120px] flex-col items-center px-4 py-16 text-center md:px-6 md:py-32">
             <Reveal>
               <h2 className="text-[32px] font-semibold leading-tight tracking-tight text-ink md:text-[48px]">
                 Only the hall counts.
@@ -103,7 +105,7 @@ export function LandingPage({
 
         {/* 3 — Your week, planned. Canvas again. */}
         <section className="bg-canvas">
-          <div className="mx-auto flex w-full max-w-[1120px] flex-col items-center px-4 py-24 text-center md:px-6 md:py-32">
+          <div className="mx-auto flex w-full max-w-[1120px] flex-col items-center px-4 py-16 text-center md:px-6 md:py-32">
             <Reveal>
               <h2 className="text-[32px] font-semibold leading-tight tracking-tight text-ink md:text-[48px]">
                 Your week, planned.
@@ -120,12 +122,14 @@ export function LandingPage({
         </section>
 
         {/* Closing — one line, one button, nothing else */}
-        <section className="mx-auto flex w-full max-w-[1120px] flex-col items-center px-4 py-24 text-center md:px-6 md:py-32">
+        <section className="mx-auto flex w-full max-w-[1120px] flex-col items-center px-4 py-16 text-center md:px-6 md:py-32">
           <h2 className="text-[32px] font-semibold leading-tight tracking-tight text-ink md:text-[48px]">
             Ready when your next lecture starts.
           </h2>
-          <div className="mt-8">
-            <Button onClick={onSignUp}>Create account</Button>
+          <div className="mt-8 w-full max-w-[320px]">
+            <Button onClick={onSignUp} className="w-full">
+              Create account
+            </Button>
           </div>
         </section>
       </main>

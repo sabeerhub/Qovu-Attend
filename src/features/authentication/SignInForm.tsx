@@ -73,7 +73,7 @@ export function SignInForm({
             />
           </label>
           {error ? <p className="text-[13px] text-danger" role="alert">{error}</p> : null}
-          <Button type="submit" disabled={loading} className="mt-1">
+          <Button type="submit" disabled={loading} className="mt-1 w-full">
             {loading ? 'Signing in…' : 'Sign in'}
           </Button>
           {onSignUp ? (

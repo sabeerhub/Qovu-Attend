@@ -43,7 +43,7 @@ word (`Active`, `Finalized`), not with a loud colored chip.
   sans-serif`. No webfont download is required; use the system font.
 - Page title: 24px, weight 600, tight letter spacing.
 - Section title: 17px, weight 600.
-- Body: 15px, weight 400, line height 1.5.
+- Body: 15px, weight 400, line height 1.5 — 17px on phones (v0.13.0, iOS type scale).
 - Secondary / caption: 13px, `#6e6e73`.
 - Numbers in summaries: 28px, weight 600 — plain, no colored
   backgrounds behind them.
@@ -60,14 +60,19 @@ internal padding.
 - **Borders:** 1px `#e5e5e5`. Shadow: at most `0 1px 2px
   rgba(0,0,0,0.04)` on cards. No other shadows.
 - **Buttons:** primary = solid `#0071e3`, white text, 8px radius,
-  height 36px. Secondary = white, 1px border. Destructive = text /
+  height 44px on phones / 36px on desktop (v0.13.0, 44pt iOS
+  touch target), 17px label on phones / 14px on desktop.
+  Secondary = white, 1px border. Destructive = text /
   border in `#c9242e`, never a solid red block. Disabled = 40%
   opacity, no pointer events.
-- **Inputs:** white, 1px `#e5e5e5` border, 8px radius, 36px height,
+- **Inputs:** white, 1px `#e5e5e5` border, 8px radius, 44px height
+  on phones / 36px on desktop, 16px text on phones (16px is what
+  stops iOS Safari auto-zooming on focus) / 14px on desktop,
   focus ring `2px rgba(0,113,227,0.35)`.
 - **Tables:** plain rows, 1px bottom hairline, 13–14px text, header
   in 12px uppercase secondary text. No zebra striping, no colored
-  row backgrounds.
+  row backgrounds. On phones (v0.13.0) tables become stacked card
+  rows — never a sideways scroll with tiny text.
 - **Sidebar (desktop):** 240px, `#f5f5f7` background, 15px nav items,
   active item is `#111111` text with a white pill background — not a
   colored bar.
@@ -76,6 +81,11 @@ internal padding.
   opens a bottom sheet with My Departments, Reports & Exports,
   Profile & Settings). Icons with labels, never icons-only;
   active tab is the accent blue. Desktop keeps the sidebar.
+  Phone rules (v0.13.0): 44pt minimum touch targets, primary
+  actions full-width and thumb-friendly at the bottom of the
+  screen, safe-area insets respected (notch / home indicator —
+  needs `viewport-fit=cover`), tables as stacked cards, 17px
+  body copy, 16px form text (no iOS zoom on focus).
 - **Status:** a 6px dot + label text.
 
 ## States (every screen must handle all four)
@@ -100,4 +110,5 @@ internal padding.
 
 - Semantic headings, labels on every input, focus-visible outlines.
 - Color is never the only signal (status always has text).
-- Minimum touch target 36px; text contrast meets WCAG AA.
+- Minimum touch target 44pt on phones, 36px on desktop (v0.13.0);
+  text contrast meets WCAG AA.

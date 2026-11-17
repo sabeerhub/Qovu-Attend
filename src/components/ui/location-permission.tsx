@@ -31,7 +31,11 @@ export function LocationBlockedPanel({ onRetry }: { onRetry: () => void }) {
           check Settings → Privacy &amp; Security → Location Services is on.
         </p>
       </div>
-      <Button variant="secondary" className="mt-3" onClick={onRetry}>
+      <Button
+        variant="secondary"
+        className="mt-3 w-full sm:w-auto"
+        onClick={onRetry}
+      >
         Try again
       </Button>
     </div>
@@ -62,7 +66,11 @@ export function LocationAllowPanel({
           mobile data. Stay near a window.
         </p>
       ) : null}
-      <Button className="mt-3" disabled={locating} onClick={onAllow}>
+      <Button
+        className="mt-3 w-full sm:w-auto"
+        disabled={locating}
+        onClick={onAllow}
+      >
         {locating ? 'Finding your location…' : 'Allow location to continue'}
       </Button>
     </div>

@@ -27,7 +27,7 @@ export function OverviewSkeleton() {
   return (
     <div className="flex flex-col gap-6" aria-label="Loading overview">
       <LoadingLabel label="Loading overview…" />
-      <Block className="h-9 w-64" />
+      <Block className="h-11 w-64" />
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <Card key={i}>
@@ -84,8 +84,8 @@ export function EligibilitySkeleton() {
       <div className="flex flex-col gap-4">
         <Card>
           <CardContent className="flex flex-col gap-3 pt-6">
-            <Block className="h-9 w-48" />
-            <Block className="h-9 w-24" />
+            <Block className="h-11 w-48" />
+            <Block className="h-11 w-24" />
           </CardContent>
         </Card>
         <div className="flex flex-col">
@@ -119,7 +119,7 @@ export function CourseListSkeleton() {
       <LoadingLabel label="Loading courses…" />
       <div className="flex items-center justify-between gap-2">
         <Block className="h-3.5 w-20" />
-        <Block className="h-9 w-28" />
+        <Block className="h-11 w-28" />
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 3 }).map((_, i) => (
@@ -158,8 +158,8 @@ export function SessionListSkeleton() {
             <Block className="h-3.5 w-20" />
             <Block className="h-5 w-16" />
             <div className="ml-auto flex gap-2">
-              <Block className="h-9 w-20" />
-              <Block className="h-9 w-16" />
+              <Block className="h-11 w-20" />
+              <Block className="h-11 w-16" />
             </div>
           </div>
         ))}
@@ -177,9 +177,9 @@ export function SessionWorkspaceSkeleton() {
         <h2 className="mb-4 text-[17px] font-semibold">New session</h2>
         <Card>
           <CardContent className="flex flex-col gap-4 pt-6">
-            <Block className="h-9 w-full max-w-xs" />
-            <Block className="h-9 w-full max-w-xs" />
-            <Block className="h-9 w-32" />
+            <Block className="h-11 w-full max-w-xs" />
+            <Block className="h-11 w-full max-w-xs" />
+            <Block className="h-11 w-32" />
           </CardContent>
         </Card>
       </section>
@@ -198,7 +198,7 @@ export function LecturePlanSkeleton() {
       <LoadingLabel label="Loading your plan…" />
       <div className="flex items-center justify-between gap-2">
         <Block className="h-3.5 w-32" />
-        <Block className="h-9 w-28" />
+        <Block className="h-11 w-28" />
       </div>
       {[0, 1].map((section) => (
         <section key={section}>
@@ -237,7 +237,7 @@ export function StudentListSkeleton() {
             <Block className="h-4 w-1/3" />
             <Block className="h-3.5 w-1/4" />
             <div className="ml-auto">
-              <Block className="h-9 w-16" />
+              <Block className="h-11 w-16" />
             </div>
           </div>
         ))}

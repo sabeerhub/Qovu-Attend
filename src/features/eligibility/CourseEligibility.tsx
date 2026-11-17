@@ -182,7 +182,7 @@ export function CourseEligibility({
 
         <Card>
           <CardContent className="flex flex-col gap-3 pt-6">
-            <label className="flex max-w-xs flex-col gap-1.5 text-[13px] font-medium text-ink">
+            <label className="flex w-full flex-col gap-1.5 text-[13px] font-medium text-ink sm:max-w-xs">
               Attendance bar (%)
               <Input
                 type="number"
@@ -196,7 +196,12 @@ export function CourseEligibility({
             </label>
             {thresholdError ? <p className="text-[13px] text-danger">{thresholdError}</p> : null}
             <div>
-              <Button type="button" disabled={savingThreshold} onClick={() => void saveThreshold()}>
+              <Button
+                type="button"
+                disabled={savingThreshold}
+                onClick={() => void saveThreshold()}
+                className="w-full sm:w-auto"
+              >
                 {savingThreshold ? 'Saving…' : 'Save bar'}
               </Button>
             </div>
@@ -229,7 +234,91 @@ export function CourseEligibility({
                 {rows.length} student{rows.length === 1 ? '' : 's'} · {held} finished session
                 {held === 1 ? '' : 's'} · bar {threshold}%
               </p>
-              <div className="overflow-x-auto">
+              {/* Phones (v0.13.0): one card per student — name, big
+                  percentage, band, and the 15 week marks wrapping
+                  into two rows. Nothing scrolls sideways, nothing
+                  clips. The table stays on desktop. */}
+              <div className="flex flex-col gap-3 md:hidden">
+                {pageRows.map((row) => (
+                  <div
+                    key={row.regNumber}
+                    className="rounded-xl border border-line bg-surface p-4 shadow-card"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-[15px] font-medium text-ink">
+                          {row.regNumber}
+                        </p>
+                        {row.studentName ? (
+                          <p className="truncate text-[13px] text-muted">{row.studentName}</p>
+                        ) : null}
+                      </div>
+                      <p className="shrink-0 text-[17px] font-semibold text-ink">
+                        {row.percentage === null ? '—' : `${row.percentage.toFixed(1)}%`}
+                      </p>
+                    </div>
+                    <p className="mt-1 text-[13px] text-muted">
+                      {row.attended} of {row.held} sessions attended
+                    </p>
+                    <p className="mt-2 text-[13px]">
+                      {row.band === 'below' ? (
+                        <span className="inline-flex items-center gap-1.5 text-danger">
+                          <span
+                            aria-hidden="true"
+                            className="inline-block h-1.5 w-1.5 rounded-full bg-danger"
+                          />
+                          Below the bar
+                        </span>
+                      ) : row.band === 'approaching' ? (
+                        <span className="inline-flex items-center gap-1.5 text-warning">
+                          <span
+                            aria-hidden="true"
+                            className="inline-block h-1.5 w-1.5 rounded-full bg-warning"
+                          />
+                          Close to the bar
+                        </span>
+                      ) : row.band === 'safe' ? (
+                        <span className="inline-flex items-center gap-1.5 text-success">
+                          <span
+                            aria-hidden="true"
+                            className="inline-block h-1.5 w-1.5 rounded-full bg-success"
+                          />
+                          Safe
+                        </span>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </p>
+                    <div
+                      className="mt-3 flex flex-wrap gap-1"
+                      aria-label="Week by week attendance"
+                    >
+                      {row.weeks.map((week, i) => (
+                        <span
+                          key={i}
+                          title={
+                            week === 'attended'
+                              ? `Week ${i + 1}: attended`
+                              : week === 'missed'
+                                ? `Week ${i + 1}: missed`
+                                : `Week ${i + 1}: no session`
+                          }
+                          className={
+                            week === 'attended'
+                              ? 'inline-flex h-6 w-6 items-center justify-center rounded text-[13px] font-medium text-success'
+                              : week === 'missed'
+                                ? 'inline-flex h-6 w-6 items-center justify-center rounded text-[13px] font-medium text-danger'
+                                : 'inline-flex h-6 w-6 items-center justify-center rounded text-[13px] text-faint'
+                          }
+                        >
+                          {week === 'attended' ? '✓' : week === 'missed' ? '✗' : '–'}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="hidden overflow-x-auto md:block">
                 <table className="w-full min-w-[720px] text-left text-sm">
                   <thead>
                     <tr className="border-b border-line text-[12px] font-medium uppercase text-muted">

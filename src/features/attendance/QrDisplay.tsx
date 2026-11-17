@@ -86,8 +86,12 @@ export function QrDisplay({
 
   if (projector) {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-white px-6 py-8">
-        <Button variant="secondary" onClick={() => setProjector(false)} className="absolute right-4 top-4">
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-white px-6 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(2rem,env(safe-area-inset-top))]">
+        <Button
+          variant="secondary"
+          onClick={() => setProjector(false)}
+          className="absolute right-4 top-[max(1rem,env(safe-area-inset-top))]"
+        >
           Close (Esc)
         </Button>
         <h3 className="text-[28px] font-semibold tracking-tight text-ink">Attendance is open</h3>
@@ -132,9 +136,9 @@ export function QrDisplay({
         <img
           src={qrDataUrl}
           alt="QR code for attendance submission"
-          width={220}
-          height={220}
-          className="mt-4 h-auto w-[220px] border border-line bg-surface p-2"
+          width={280}
+          height={280}
+          className="mx-auto mt-4 h-auto w-[260px] border border-line bg-surface p-2 sm:w-[220px]"
         />
       ) : qrError ? (
         <p className="mt-4 text-[13px] text-danger" role="alert">

@@ -347,7 +347,11 @@ export function SessionForm({
           Session created as a draft.
         </p>
       ) : null}
-      <Button type="submit" disabled={loading} className="self-start">
+      <Button
+        type="submit"
+        disabled={loading}
+        className="w-full sm:w-auto sm:self-start"
+      >
         {loading ? 'Creating…' : 'Create draft session'}
       </Button>
     </form>

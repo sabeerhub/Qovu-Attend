@@ -191,7 +191,7 @@ export function SelfieStep({ onDone }: { onDone: (selfie: CapturedSelfie) => voi
   return (
     <div className="mt-6 flex flex-col items-center rounded-xl border border-line bg-surface p-6 text-center">
       <h2 className="text-[17px] font-semibold text-ink">Take a live selfie</h2>
-      <p className="mt-1 self-stretch text-left text-[13px] text-muted">
+      <p className="mt-1 self-stretch text-left text-[15px] leading-relaxed text-muted">
         A live selfie is required to submit your attendance. This photo is only used to check
         the same face is not used twice in this class, and it is deleted after the session. If
         your phone has no front camera, go to your lecturer — they will add you by hand.
@@ -203,7 +203,7 @@ export function SelfieStep({ onDone }: { onDone: (selfie: CapturedSelfie) => voi
             <FaceFrame mode="idle" />
           </div>
           <p className="mt-6 text-[17px] font-semibold text-ink">Look straight into the camera</p>
-          <p className="mt-1 text-[13px] text-muted">
+          <p className="mt-1 text-[15px] text-muted">
             Only one still photo is taken — no video is recorded.
           </p>
           <div className="mt-6 w-full max-w-[280px]">
@@ -233,7 +233,7 @@ export function SelfieStep({ onDone }: { onDone: (selfie: CapturedSelfie) => voi
             </FaceFrame>
           </div>
           <p className="mt-6 text-[17px] font-semibold text-ink">Look straight into the camera</p>
-          <p className="mt-1 text-[13px] text-muted">
+          <p className="mt-1 text-[15px] text-muted">
             Only one still photo is taken — no video is recorded.
           </p>
           <div className="mt-6 w-full max-w-[280px]">
@@ -256,7 +256,7 @@ export function SelfieStep({ onDone }: { onDone: (selfie: CapturedSelfie) => voi
             </FaceFrame>
           </div>
           <p className="mt-6 text-[17px] font-semibold text-ink">Photo taken</p>
-          <p className="mt-1 text-[13px] text-muted">
+          <p className="mt-1 text-[15px] text-muted">
             Use this photo to submit your attendance, or retake it.
           </p>
           <div className="mt-6 flex w-full max-w-[280px] flex-col gap-3">

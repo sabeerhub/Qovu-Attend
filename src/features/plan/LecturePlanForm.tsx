@@ -209,11 +209,20 @@ export function LecturePlanForm({
           {error}
         </p>
       ) : null}
-      <div className="flex gap-2">
-        <Button type="submit" disabled={loading}>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Button
+          type="submit"
+          disabled={loading}
+          className="w-full sm:w-auto"
+        >
           {loading ? 'Saving…' : initial ? 'Save changes' : 'Add to plan'}
         </Button>
-        <Button type="button" variant="secondary" onClick={onCancel}>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onCancel}
+          className="w-full sm:w-auto"
+        >
           Cancel
         </Button>
       </div>

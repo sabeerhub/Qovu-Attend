@@ -17,7 +17,7 @@ export function PublicTopBar({
   onSignUp: () => void;
 }) {
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-surface">
+    <header className="sticky top-0 z-30 border-b border-line bg-surface pt-[env(safe-area-inset-top)]">
       <div className="mx-auto flex w-full max-w-[1120px] items-center justify-between px-4 py-3 md:px-6">
         <button type="button" onClick={onHome} aria-label="Qovu — back to the home page">
           <QovuBrand markSize={24} textClassName="text-[17px]" />

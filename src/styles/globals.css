@@ -146,6 +146,34 @@
   stroke-dashoffset: 0;
 }
 
+/* Mobile foundation (v0.13.0): Apple-level phone rules.
+   Everything here lives under 768px, so desktop is untouched.
+   - 44pt minimum touch targets on every button and form control
+     (iOS Human Interface Guidelines); min-height wins over the
+     36px heights the components set for desktop.
+   - 16px form text so iOS Safari never auto-zooms on focus. The
+     class-qualified selector is needed: Tailwind's `.text-sm`
+     (0,1,0) beats a bare element selector.
+   - 17px body copy on phones, per the iOS type scale. */
+@media (max-width: 767px) {
+  body {
+    font-size: 17px;
+  }
+  button {
+    min-height: 44px;
+  }
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+  }
+  input.text-sm,
+  select.text-sm,
+  textarea.text-sm {
+    font-size: 16px;
+  }
+}
+
 /* Skeleton loading (v0.7.0): neutral grey blocks in the shape of
    the content that is coming, with a calm opacity pulse. */
 .skeleton {

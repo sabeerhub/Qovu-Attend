@@ -10,7 +10,7 @@ export interface EmptyStateProps {
 export function EmptyState({ title, description, actionLabel, onAction }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-start gap-2 rounded-xl border border-line bg-surface px-6 py-10">
-      <p className="text-[15px] font-medium text-ink">{title}</p>
+      <p className="text-[17px] font-medium text-ink">{title}</p>
       <p className="text-[13px] text-muted">{description}</p>
       {actionLabel && onAction ? (
         <Button className="mt-2" onClick={onAction}>
@@ -43,7 +43,7 @@ export function ErrorState({
 }) {
   return (
     <div className="flex flex-col items-start gap-2 rounded-xl border border-line bg-surface px-6 py-10">
-      <p className="text-[15px] font-medium text-ink">Something went wrong</p>
+      <p className="text-[17px] font-medium text-ink">Something went wrong</p>
       <p className="text-[13px] text-muted">{message}</p>
       {hint ? <p className="text-[13px] text-muted">{hint}</p> : null}
       {onRetry ? (

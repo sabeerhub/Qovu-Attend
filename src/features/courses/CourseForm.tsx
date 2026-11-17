@@ -256,11 +256,21 @@ export function CourseForm({
             </p>
           ) : null}
 
-          <div className="flex gap-2">
-            <Button type="submit" disabled={loading}>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full sm:w-auto"
+            >
               {loading ? 'Creating…' : 'Create course'}
             </Button>
-            <Button type="button" variant="secondary" onClick={onCancel} disabled={loading}>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={onCancel}
+              disabled={loading}
+              className="w-full sm:w-auto"
+            >
               Cancel
             </Button>
           </div>

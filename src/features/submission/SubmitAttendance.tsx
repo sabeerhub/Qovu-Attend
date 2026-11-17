@@ -369,7 +369,7 @@ export function SubmitAttendance(props?: { passcode?: string }) {
         </div>
       ) : (
         <form onSubmit={(e) => void onSubmit(e)} className="mt-6 flex flex-col gap-4">
-          <p className="text-[13px] text-muted">
+          <p className="text-[15px] leading-relaxed text-muted">
             Enter your registration number to record attendance for this session. No account is
             needed. Your location is required — attendance is only recorded while you are in
             the lecture hall — and one device can only submit for one student. After that you
@@ -423,7 +423,11 @@ export function SubmitAttendance(props?: { passcode?: string }) {
               {formError}
             </p>
           ) : null}
-          <Button type="submit" disabled={locationGate !== null} className="self-start">
+          <Button
+            type="submit"
+            disabled={locationGate !== null}
+            className="w-full sm:w-auto"
+          >
             Submit attendance
           </Button>
         </form>

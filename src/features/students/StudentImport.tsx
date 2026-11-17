@@ -139,7 +139,7 @@ export function StudentImport({
           type="file"
           accept=".csv,text/csv"
           onChange={(e) => void onFileChosen(e.target.files?.[0])}
-          className="max-w-xs"
+          className="w-full sm:max-w-xs"
         />
         <Button type="button" variant="secondary" onClick={downloadSample}>
           Sample CSV

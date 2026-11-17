@@ -47,6 +47,117 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 /**
+ * Face-review panel (v0.13.0): the flagged-record UI — photo, the
+ * plain-words warning, and the confirm/dismiss form — shared by
+ * the desktop table row and the phone card row, so the two never
+ * drift apart. Defined at module level (not inside the monitor)
+ * so typing a reason never remounts the input.
+ */
+function FaceReviewPanel({
+  record,
+  photoUrl,
+  photoLoading,
+  photoError,
+  editable,
+  reviewing,
+  reason,
+  reviewError,
+  busy,
+  onLoadPhoto,
+  onStartReview,
+  onReasonChange,
+  onReview,
+}: {
+  record: AttendanceRecord;
+  photoUrl: string | undefined;
+  photoLoading: boolean;
+  photoError: string | null;
+  editable: boolean;
+  reviewing: boolean;
+  reason: string;
+  reviewError: string | null;
+  busy: boolean;
+  onLoadPhoto: () => void;
+  onStartReview: () => void;
+  onReasonChange: (value: string) => void;
+  onReview: (decision: 'confirm' | 'dismiss') => void;
+}) {
+  return (
+    <span className="mt-2 block max-w-xs rounded-lg border border-line bg-canvas px-3 py-2 text-[13px] text-ink">
+      <span className="font-medium">
+        Same face used for another number in this class — check it.
+      </span>{' '}
+      This is a flag to review, not proof of cheating: similar faces
+      can be flagged by mistake.
+      {record.selfie_path ? (
+        photoUrl ? (
+          <img
+            src={photoUrl}
+            alt={`Selfie for ${record.registration_number}`}
+            className="mt-2 w-40 rounded-lg"
+          />
+        ) : (
+          <span className="mt-2 block">
+            <Button variant="secondary" disabled={photoLoading} onClick={onLoadPhoto}>
+              {photoLoading ? 'Loading photo…' : 'View photo'}
+            </Button>
+            {photoError ? (
+              <span className="mt-1 block text-danger">{photoError}</span>
+            ) : null}
+          </span>
+        )
+      ) : (
+        <span className="mt-1 block text-muted">
+          The photo was deleted when the session was finalized.
+        </span>
+      )}
+      {editable ? (
+        reviewing ? (
+          <span className="mt-3 block">
+            <label className="flex flex-col gap-1.5 text-[13px] font-medium text-ink">
+              Reason (required)
+              <Input
+                value={reason}
+                onChange={(e) => onReasonChange(e.target.value)}
+                placeholder="What did you check?"
+              />
+            </label>
+            {reviewError ? (
+              <span className="mt-1 block text-danger" role="alert">
+                {reviewError}
+              </span>
+            ) : null}
+            <span className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <Button
+                disabled={busy}
+                onClick={() => onReview('confirm')}
+                className="w-full sm:w-auto"
+              >
+                {busy ? 'Saving…' : 'Confirm — same face'}
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={busy}
+                onClick={() => onReview('dismiss')}
+                className="w-full sm:w-auto"
+              >
+                Dismiss — checked, fine
+              </Button>
+            </span>
+          </span>
+        ) : (
+          <span className="mt-2 block">
+            <Button variant="secondary" onClick={onStartReview}>
+              Review this flag
+            </Button>
+          </span>
+        )
+      ) : null}
+    </span>
+  );
+}
+
+/**
  * Session monitoring (spec §8). For one Active/Closed session — and
  * read-only for Finalized/Archived ones — it shows the physical
  * headcount, verified / manual / pending / rejected / suspicious
@@ -491,7 +602,76 @@ export function SessionMonitor({
             }
           />
         ) : (
-          <table className="w-full text-left text-sm">
+          <>
+            {/* Phones (v0.13.0): one card per record — number, status,
+                method and date, with the face-review panel and the
+                Correct button inline. The table stays on desktop. */}
+            <ul className="flex flex-col gap-3 md:hidden">
+              {records.map((record) => (
+                <li
+                  key={record.id}
+                  className="rounded-xl border border-line bg-surface p-4 shadow-card"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-[15px] font-medium text-ink">
+                        {record.registration_number}
+                      </p>
+                      <p className="mt-0.5 text-[13px] text-muted">
+                        {new Date(record.submitted_at).toLocaleString()}
+                      </p>
+                      {record.manual_reason ? (
+                        <p className="mt-0.5 text-[13px] text-muted">{record.manual_reason}</p>
+                      ) : null}
+                    </div>
+                    <span className="shrink-0">
+                      <StatusBadge status={record.status} />
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[13px] text-muted">
+                    {record.verification_method ?? '—'}
+                  </p>
+                  {record.face_review ? (
+                    <FaceReviewPanel
+                      record={record}
+                      photoUrl={photoUrls[record.id]}
+                      photoLoading={photoLoadingId === record.id}
+                      photoError={photoError}
+                      editable={editable}
+                      reviewing={faceReviewId === record.id}
+                      reason={faceReviewReason}
+                      reviewError={faceReviewError}
+                      busy={faceReviewBusy}
+                      onLoadPhoto={() => void loadPhoto(record)}
+                      onStartReview={() => {
+                        setFaceReviewId(record.id);
+                        setFaceReviewReason('');
+                        setFaceReviewError(null);
+                      }}
+                      onReasonChange={(value) => setFaceReviewReason(value)}
+                      onReview={(decision) => void onFaceReview(record, decision)}
+                    />
+                  ) : null}
+                  {editable ? (
+                    <div className="mt-3">
+                      <Button
+                        variant="secondary"
+                        className="w-full"
+                        onClick={() => {
+                          setCorrectingId(correctingId === record.id ? null : record.id);
+                          setCorrectStatus(record.status);
+                          setCorrectReason('');
+                          setCorrectError(null);
+                        }}
+                      >
+                        {correctingId === record.id ? 'Cancel' : 'Correct'}
+                      </Button>
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+            <table className="hidden w-full text-left text-sm md:table">
             <thead>
               <tr className="border-b border-line text-[12px] uppercase text-muted">
                 <th className="py-2 pr-4 font-medium">Registration number</th>
@@ -507,86 +687,25 @@ export function SessionMonitor({
                   <td className="py-3 pr-4 text-ink">
                     {record.registration_number}
                     {record.face_review ? (
-                      <span className="mt-2 block max-w-xs rounded-lg border border-line bg-canvas px-3 py-2 text-[13px] text-ink">
-                        <span className="font-medium">
-                          Same face used for another number in this class — check it.
-                        </span>{' '}
-                        This is a flag to review, not proof of cheating: similar faces
-                        can be flagged by mistake.
-                        {record.selfie_path ? (
-                          photoUrls[record.id] ? (
-                            <img
-                              src={photoUrls[record.id]}
-                              alt={`Selfie for ${record.registration_number}`}
-                              className="mt-2 w-40 rounded-lg"
-                            />
-                          ) : (
-                            <span className="mt-2 block">
-                              <Button
-                                variant="secondary"
-                                disabled={photoLoadingId === record.id}
-                                onClick={() => void loadPhoto(record)}
-                              >
-                                {photoLoadingId === record.id ? 'Loading photo…' : 'View photo'}
-                              </Button>
-                              {photoError ? (
-                                <span className="mt-1 block text-danger">{photoError}</span>
-                              ) : null}
-                            </span>
-                          )
-                        ) : (
-                          <span className="mt-1 block text-muted">
-                            The photo was deleted when the session was finalized.
-                          </span>
-                        )}
-                        {editable ? (
-                          faceReviewId === record.id ? (
-                            <span className="mt-3 block">
-                              <label className="flex flex-col gap-1.5 text-[13px] font-medium text-ink">
-                                Reason (required)
-                                <Input
-                                  value={faceReviewReason}
-                                  onChange={(e) => setFaceReviewReason(e.target.value)}
-                                  placeholder="What did you check?"
-                                />
-                              </label>
-                              {faceReviewError ? (
-                                <span className="mt-1 block text-danger" role="alert">
-                                  {faceReviewError}
-                                </span>
-                              ) : null}
-                              <span className="mt-2 flex flex-wrap gap-2">
-                                <Button
-                                  disabled={faceReviewBusy}
-                                  onClick={() => void onFaceReview(record, 'confirm')}
-                                >
-                                  {faceReviewBusy ? 'Saving…' : 'Confirm — same face'}
-                                </Button>
-                                <Button
-                                  variant="secondary"
-                                  disabled={faceReviewBusy}
-                                  onClick={() => void onFaceReview(record, 'dismiss')}
-                                >
-                                  Dismiss — checked, fine
-                                </Button>
-                              </span>
-                            </span>
-                          ) : (
-                            <span className="mt-2 block">
-                              <Button
-                                variant="secondary"
-                                onClick={() => {
-                                  setFaceReviewId(record.id);
-                                  setFaceReviewReason('');
-                                  setFaceReviewError(null);
-                                }}
-                              >
-                                Review this flag
-                              </Button>
-                            </span>
-                          )
-                        ) : null}
-                      </span>
+                      <FaceReviewPanel
+                        record={record}
+                        photoUrl={photoUrls[record.id]}
+                        photoLoading={photoLoadingId === record.id}
+                        photoError={photoError}
+                        editable={editable}
+                        reviewing={faceReviewId === record.id}
+                        reason={faceReviewReason}
+                        reviewError={faceReviewError}
+                        busy={faceReviewBusy}
+                        onLoadPhoto={() => void loadPhoto(record)}
+                        onStartReview={() => {
+                          setFaceReviewId(record.id);
+                          setFaceReviewReason('');
+                          setFaceReviewError(null);
+                        }}
+                        onReasonChange={(value) => setFaceReviewReason(value)}
+                        onReview={(decision) => void onFaceReview(record, decision)}
+                      />
                     ) : null}
                   </td>
                   <td className="py-3 pr-4">
@@ -618,6 +737,7 @@ export function SessionMonitor({
               ))}
             </tbody>
           </table>
+          </>
         )}
 
         {correctingId && editable
@@ -659,7 +779,11 @@ export function SessionMonitor({
                       {correctError}
                     </p>
                   ) : null}
-                  <Button type="submit" disabled={correctBusy} className="self-start">
+                  <Button
+                    type="submit"
+                    disabled={correctBusy}
+                    className="w-full sm:w-auto sm:self-start"
+                  >
                     {correctBusy ? 'Saving…' : 'Save correction'}
                   </Button>
                 </form>
@@ -694,7 +818,11 @@ export function SessionMonitor({
                 {manualError}
               </p>
             ) : null}
-            <Button type="submit" disabled={manualBusy} className="self-start">
+            <Button
+              type="submit"
+              disabled={manualBusy}
+              className="w-full sm:w-auto sm:self-start"
+            >
               {manualBusy ? 'Adding…' : 'Add manually'}
             </Button>
           </form>
@@ -755,7 +883,7 @@ export function SessionMonitor({
                 />
               )
             ) : null}
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               {LIFECYCLE_ACTIONS.filter((a) => canTransitionSession(session.status, a.to)).map(
                 (action) => {
                   // Reopen (closed → active) is labelled differently from Start (draft → active).
@@ -769,6 +897,7 @@ export function SessionMonitor({
                       variant={action.variant}
                       disabled={acting !== null || locationGate !== null}
                       onClick={() => void runTransition(action.to)}
+                      className="w-full sm:w-auto"
                     >
                       {acting === action.to ? 'Working…' : label}
                     </Button>
@@ -782,8 +911,13 @@ export function SessionMonitor({
           </div>
         )}
         {session.status === 'finalized' && canTransitionSession(session.status, 'archived') ? (
-          <div className="mt-3 flex flex-wrap gap-3">
-            <Button variant="danger" disabled={acting !== null || locationGate !== null} onClick={() => void runTransition('archived')}>
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <Button
+              variant="danger"
+              disabled={acting !== null || locationGate !== null}
+              onClick={() => void runTransition('archived')}
+              className="w-full sm:w-auto"
+            >
               {acting === 'archived' ? 'Working…' : 'Archive'}
             </Button>
           </div>

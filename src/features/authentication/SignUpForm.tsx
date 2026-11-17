@@ -173,7 +173,7 @@ export function SignUpForm({
               {error}
             </p>
           ) : null}
-          <Button type="submit" disabled={loading} className="mt-1">
+          <Button type="submit" disabled={loading} className="mt-1 w-full">
             {loading ? 'Creating your account…' : 'Create account'}
           </Button>
           {onSignIn ? (

@@ -3,7 +3,9 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex h-9 items-center justify-center rounded-lg px-4 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-40',
+  // 44pt touch target on phones (v0.13.0), 36px on desktop — the
+  // md: height restores the desktop size, so desktop is unchanged.
+  'inline-flex h-11 items-center justify-center rounded-lg px-4 text-[17px] font-medium transition-colors disabled:pointer-events-none disabled:opacity-40 md:h-9 md:text-sm',
   {
     variants: {
       variant: {

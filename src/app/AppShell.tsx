@@ -159,7 +159,7 @@ export function AppShell() {
     <div className="flex min-h-screen bg-surface">
       <Sidebar current={current} onNavigate={setCurrent} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-surface px-4 py-4 md:px-6 md:py-5">
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-surface px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] md:px-6 md:py-5">
           <h1 className="text-2xl font-semibold tracking-tight text-ink">{NAV_TITLES[current]}</h1>
           <Button
             variant="ghost"
@@ -170,7 +170,7 @@ export function AppShell() {
             Sign out
           </Button>
         </header>
-        <main className="mx-auto w-full max-w-[1120px] px-4 py-6 pb-24 md:px-6 md:py-8 md:pb-8">
+        <main className="mx-auto w-full max-w-[1120px] px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:px-6 md:py-8 md:pb-8">
           {current === 'overview' ? <Overview /> : null}
           {current === 'departments' ? <DepartmentList /> : null}
           {current === 'courses' ? <CourseList /> : null}

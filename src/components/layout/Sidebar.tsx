@@ -117,7 +117,7 @@ export function MobileNav({
                 onClick={() => onNavigate(item.key)}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'flex min-h-[52px] flex-col items-center justify-center gap-0.5 pb-1.5 pt-2 text-[10px] leading-none',
+                  'flex min-h-[52px] flex-col items-center justify-center gap-0.5 pb-1.5 pt-2 text-[10px] leading-none transition-colors',
                   active ? 'font-medium text-accent' : 'text-muted',
                 )}
               >
@@ -133,7 +133,7 @@ export function MobileNav({
             aria-expanded={moreOpen}
             aria-current={moreActive ? 'page' : undefined}
             className={cn(
-              'flex min-h-[52px] flex-col items-center justify-center gap-0.5 pb-1.5 pt-2 text-[10px] leading-none',
+              'flex min-h-[52px] flex-col items-center justify-center gap-0.5 pb-1.5 pt-2 text-[10px] leading-none transition-colors',
               moreActive ? 'font-medium text-accent' : 'text-muted',
             )}
           >
@@ -171,7 +171,7 @@ export function MobileNav({
                     }}
                     aria-current={active ? 'page' : undefined}
                     className={cn(
-                      'flex w-full items-center justify-between rounded-lg px-3 py-3 text-left text-[15px]',
+                      'flex w-full items-center justify-between rounded-lg px-3 py-3 text-left text-[15px] transition-colors',
                       active ? 'font-medium text-accent' : 'text-ink',
                     )}
                   >
