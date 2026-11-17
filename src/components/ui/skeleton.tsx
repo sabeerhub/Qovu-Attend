@@ -22,24 +22,24 @@ function LoadingLabel({ label }: { label: string }) {
   );
 }
 
-/** Mirrors the Overview stat cards + activity card layout. */
+/** Mirrors the Overview layout (v0.13.1): filter, one grouped
+ *  stat card with a 2x2 grid of big numbers, then the activity
+ *  card and the attention card. */
 export function OverviewSkeleton() {
   return (
-    <div className="flex flex-col gap-6" aria-label="Loading overview">
+    <div className="flex flex-col gap-8" aria-label="Loading overview">
       <LoadingLabel label="Loading overview…" />
       <Block className="h-11 w-64" />
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Card key={i}>
-            <CardHeader>
+      <Card>
+        <div className="grid grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex flex-col gap-2 px-5 py-5">
+              <Block className="h-9 w-14" />
               <Block className="h-3.5 w-24" />
-            </CardHeader>
-            <CardContent>
-              <Block className="h-7 w-12" />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+            </div>
+          ))}
+        </div>
+      </Card>
       <Card>
         <CardHeader>
           <CardTitle>Recent activity</CardTitle>

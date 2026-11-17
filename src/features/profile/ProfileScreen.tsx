@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { LogOut } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAssignments } from '@/hooks/useAssignments';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -84,8 +85,19 @@ export function ProfileScreen() {
         </CardContent>
       </Card>
 
+      {/* Icon-led sign-out row (v0.13.1): the log-out icon with
+          the "Sign out" label, full-width like an iOS settings row.
+          Signs out immediately — there is no confirmation step,
+          exactly as before. The header icon and the More-sheet row
+          do the same. */}
       <div className="flex flex-col items-start gap-2">
-        <Button variant="secondary" onClick={() => void onSignOut()} disabled={signingOut}>
+        <Button
+          variant="danger"
+          className="w-full justify-start gap-2"
+          onClick={() => void onSignOut()}
+          disabled={signingOut}
+        >
+          <LogOut size={20} aria-hidden="true" />
           {signingOut ? 'Signing out…' : 'Sign out'}
         </Button>
         {signOutError ? (

@@ -10,7 +10,11 @@ color, generous whitespace. **No AI slop.**
 Explicitly forbidden in this product:
 
 - Gradients of any kind (especially purple/blue gradient blobs).
-- Glassmorphism, frosted panels, heavy shadows, glow effects.
+- Glassmorphism, frosted panels, heavy shadows, glow effects —
+  with ONE owner-approved exception (v0.13.1): the mobile pill
+  navigation below is frosted white with a backdrop blur, because
+  the owner asked for exactly that Apple Liquid Glass look. The
+  blur lives only in that one pill; nothing else frosts.
 - Oversized decorative icons, illustration packs, emoji in the UI.
 - Cluttered dashboards, stat-card walls, unnecessary animation.
 - More than one accent color, and the accent used for decoration
@@ -45,8 +49,8 @@ word (`Active`, `Finalized`), not with a loud colored chip.
 - Section title: 17px, weight 600.
 - Body: 15px, weight 400, line height 1.5 — 17px on phones (v0.13.0, iOS type scale).
 - Secondary / caption: 13px, `#6e6e73`.
-- Numbers in summaries: 28px, weight 600 — plain, no colored
-  backgrounds behind them.
+- Numbers in summaries: 34px, weight 600 — plain, no colored
+  backgrounds behind them (Overview stat card, v0.13.1).
 
 ## Spacing
 
@@ -76,16 +80,29 @@ internal padding.
 - **Sidebar (desktop):** 240px, `#f5f5f7` background, 15px nav items,
   active item is `#111111` text with a white pill background — not a
   colored bar.
-- **Mobile:** an iOS-style bottom tab bar on mobile (four tabs —
-  Overview, Courses, Sessions, History — plus a "More" tab that
-  opens a bottom sheet with My Departments, Reports & Exports,
-  Profile & Settings). Icons with labels, never icons-only;
-  active tab is the accent blue. Desktop keeps the sidebar.
+- **Mobile (v0.13.1):** a floating frosted-white pill tab bar
+  (Apple Liquid Glass, in our colors): centred, floating 16px
+  above the safe area, fully rounded, translucent white
+  (`bg-surface/80`) + backdrop blur + 1px `#e5e5e5` hairline +
+  one soft shadow — the ONLY frosted surface in the product, an
+  owner-approved exception to the no-glassmorphism rule. Four
+  tabs (Overview, Courses, Sessions, History) plus a "More" tab
+  that opens a bottom sheet with the remaining sections; the
+  sheet also carries a Sign out row (log-out icon + label, danger
+  color). Active tab: accent-blue icon + small label inside a
+  soft rounded highlight (`bg-accent/10`); inactive tabs: ink
+  icon only, with the section name as the button's aria-label
+  (screen readers still hear it). No gradients, no dark pill.
   Phone rules (v0.13.0): 44pt minimum touch targets, primary
   actions full-width and thumb-friendly at the bottom of the
   screen, safe-area insets respected (notch / home indicator —
   needs `viewport-fit=cover`), tables as stacked cards, 17px
   body copy, 16px form text (no iOS zoom on focus).
+- **Sign out** is an icon action everywhere (v0.13.1): a
+  log-out icon button in the header (icon-only, aria-label
+  "Sign out"), an icon + "Sign out" row in the More sheet, and
+  an icon + "Sign out" full-width row on the Profile screen. It
+  signs out immediately — there is no confirmation step.
 - **Status:** a 6px dot + label text.
 
 ## States (every screen must handle all four)

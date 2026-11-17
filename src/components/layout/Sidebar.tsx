@@ -6,6 +6,7 @@ import {
   Ellipsis,
   History,
   House,
+  LogOut,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -70,22 +71,35 @@ export function Sidebar({
 }
 
 /**
- * Mobile navigation (iOS-style bottom tab bar, mobile only).
+ * Mobile navigation (v0.13.1): a floating frosted-white pill tab
+ * bar, like the Apple Liquid Glass pill the owner sent — but in
+ * our colors. The pill floats above the safe area (never glued to
+ * the bottom edge), is fully rounded, translucent white with a
+ * backdrop blur, a 1px hairline and a soft shadow. Active item:
+ * accent-blue icon + small label inside a soft rounded highlight.
+ * Inactive items: ink icon only (labels are still on every button
+ * as aria-labels, so screen readers hear the section name).
  *
  * Four tabs — Overview, Courses, Sessions, History — plus a "More"
- * tab that opens a bottom sheet with My Departments, My Lecture Plan,
- * Reports & Exports, and Profile & Settings. Active tab is the accent blue;
- * inactive tabs are muted grey. Labels are always shown next to
- * the icons (never icons-only). The bar is fixed to the bottom of
- * the viewport; AppShell adds bottom padding to the content so the
- * bar never covers anything. Desktop keeps the sidebar unchanged.
+ * tab that opens a bottom sheet with My Departments, My Lecture
+ * Plan, Reports & Exports, and Profile & Settings. Five slots fit
+ * the pill cleanly at phone width, so the grouping is unchanged
+ * from the old full-width bar — nothing moved, nothing hidden.
+ * The sheet also carries a Sign out row (icon + label, danger
+ * color); it signs out immediately, exactly like the header
+ * sign-out does — there is no confirmation step anywhere today.
+ * AppShell adds bottom padding to the content so the floating pill
+ * never covers anything. Desktop keeps the sidebar unchanged.
  */
 export function MobileNav({
   current,
   onNavigate,
+  onSignOut,
 }: {
   current: NavKey;
   onNavigate: (key: NavKey) => void;
+  /** Signs out immediately, same as the header sign-out. */
+  onSignOut: () => void;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
 
@@ -104,9 +118,9 @@ export function MobileNav({
     <>
       <nav
         aria-label="Lecturer portal"
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
+        className="fixed inset-x-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-[420px] rounded-full border border-line bg-surface/80 shadow-[0_8px_24px_rgba(17,17,17,0.12)] backdrop-blur-xl md:hidden"
       >
-        <div className="grid grid-cols-5">
+        <div className="flex items-center justify-between px-2 py-1.5">
           {TAB_BAR_ITEMS.map((item) => {
             const Icon = TAB_ICONS[item.key];
             const active = current === item.key;
@@ -116,13 +130,14 @@ export function MobileNav({
                 type="button"
                 onClick={() => onNavigate(item.key)}
                 aria-current={active ? 'page' : undefined}
+                aria-label={item.label}
                 className={cn(
-                  'flex min-h-[52px] flex-col items-center justify-center gap-0.5 pb-1.5 pt-2 text-[10px] leading-none transition-colors',
-                  active ? 'font-medium text-accent' : 'text-muted',
+                  'flex min-h-[52px] min-w-[52px] flex-1 flex-col items-center justify-center gap-0.5 rounded-full px-1 py-1.5 text-[10px] leading-none transition-colors',
+                  active ? 'bg-accent/10 font-medium text-accent' : 'text-muted',
                 )}
               >
                 <Icon size={22} strokeWidth={active ? 2.25 : 2} aria-hidden="true" />
-                {item.label}
+                {active ? item.label : null}
               </button>
             );
           })}
@@ -132,13 +147,14 @@ export function MobileNav({
             aria-haspopup="dialog"
             aria-expanded={moreOpen}
             aria-current={moreActive ? 'page' : undefined}
+            aria-label="More sections"
             className={cn(
-              'flex min-h-[52px] flex-col items-center justify-center gap-0.5 pb-1.5 pt-2 text-[10px] leading-none transition-colors',
-              moreActive ? 'font-medium text-accent' : 'text-muted',
+              'flex min-h-[52px] min-w-[52px] flex-1 flex-col items-center justify-center gap-0.5 rounded-full px-1 py-1.5 text-[10px] leading-none transition-colors',
+              moreActive ? 'bg-accent/10 font-medium text-accent' : 'text-muted',
             )}
           >
             <Ellipsis size={22} strokeWidth={moreActive ? 2.25 : 2} aria-hidden="true" />
-            More
+            {moreActive ? 'More' : null}
           </button>
         </div>
       </nav>
@@ -185,7 +201,18 @@ export function MobileNav({
                 );
               })}
             </nav>
-            <div className="border-t border-line px-4 py-3">
+            <div className="border-t border-line px-2 pb-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setMoreOpen(false);
+                  onSignOut();
+                }}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-[15px] font-medium text-danger"
+              >
+                <LogOut size={20} aria-hidden="true" />
+                Sign out
+              </button>
               <button
                 type="button"
                 onClick={() => setMoreOpen(false)}

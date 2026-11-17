@@ -23,6 +23,7 @@ import type { CreatedDraftSession } from '@/lib/sessionCreation';
 import { HistoryList } from '@/features/history/HistoryList';
 import { ReportsPanel } from '@/features/reports/ReportsPanel';
 import { ProfileScreen } from '@/features/profile/ProfileScreen';
+import { LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { QovuBrand } from '@/components/brand/QovuBrand';
 import { EmptyState, LoadingState } from '@/components/ui/empty-state';
@@ -161,13 +162,19 @@ export function AppShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-surface px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] md:px-6 md:py-5">
           <h1 className="text-2xl font-semibold tracking-tight text-ink">{NAV_TITLES[current]}</h1>
+          {/* Icon-only sign-out (v0.13.1): signs out immediately,
+              exactly as the old text button did — there is no
+              confirmation step anywhere today. */}
           <Button
             variant="ghost"
+            aria-label="Sign out"
+            title="Sign out"
+            className="h-11 w-11 rounded-full p-0"
             onClick={() => {
               void supabase?.auth.signOut();
             }}
           >
-            Sign out
+            <LogOut size={22} aria-hidden="true" />
           </Button>
         </header>
         <main className="mx-auto w-full max-w-[1120px] px-4 py-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:px-6 md:py-8 md:pb-8">
@@ -199,9 +206,15 @@ export function AppShell() {
           {current === 'reports' ? <ReportsPanel /> : null}
           {current === 'profile' ? <ProfileScreen /> : null}
         </main>
-        {/* Fixed bottom tab bar on mobile; the pb-24 above keeps it
+        {/* Floating pill tab bar on mobile; the pb-24 above keeps it
             from ever covering content. Desktop uses the sidebar. */}
-        <MobileNav current={current} onNavigate={setCurrent} />
+        <MobileNav
+          current={current}
+          onNavigate={setCurrent}
+          onSignOut={() => {
+            void supabase?.auth.signOut();
+          }}
+        />
       </div>
     </div>
   );

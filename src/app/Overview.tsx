@@ -45,8 +45,8 @@ export function Overview() {
   const isEmpty = items.every((item) => item.value === 0);
 
   return (
-    <div className="flex flex-col gap-6">
-      <label className="flex w-full flex-col gap-1.5 text-[13px] font-medium text-ink sm:max-w-xs">
+    <div className="flex flex-col gap-8">
+      <label className="flex w-full flex-col gap-2 text-[13px] font-medium text-ink sm:max-w-xs">
         Department
         <select
           className="h-11 rounded-lg border border-line bg-surface px-3 text-base text-ink md:h-9 md:text-sm"
@@ -62,18 +62,20 @@ export function Overview() {
         </select>
       </label>
 
-      <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
-        {items.map((item) => (
-          <Card key={item.label}>
-            <CardHeader className="px-4 pt-4 sm:px-6 sm:pt-5">
-              <CardTitle className="text-[13px] font-normal text-muted">{item.label}</CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 pb-4 pt-0 sm:px-6 sm:py-5">
-              <p className="text-[28px] font-semibold leading-none text-ink">{item.value}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {/* One grouped stat card (v0.13.1): big numbers on top,
+          labels underneath — no cramped four-card wall. */}
+      <Card>
+        <div className="grid grid-cols-2 lg:grid-cols-4">
+          {items.map((item) => (
+            <div key={item.label} className="flex flex-col gap-1 px-5 py-5">
+              <p className="text-[34px] font-semibold leading-none tracking-tight text-ink">
+                {item.value}
+              </p>
+              <p className="text-[13px] text-muted">{item.label}</p>
+            </div>
+          ))}
+        </div>
+      </Card>
       {isEmpty ? (
         <EmptyState
           title="No attendance data yet"
@@ -82,20 +84,20 @@ export function Overview() {
       ) : null}
 
       <Card>
-        <CardHeader>
+        <CardHeader className="px-5 pt-5 sm:px-6">
           <CardTitle>Recent activity</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col gap-6">
-          <div>
-            <h3 className="mb-2 text-[13px] font-medium text-muted">Recent sessions</h3>
+        <CardContent className="flex flex-col gap-8 px-5 py-5 sm:px-6">
+          <section>
+            <h3 className="mb-1 text-[15px] font-semibold text-ink">Recent sessions</h3>
             {recentSessions.length === 0 ? (
               <p className="text-[13px] text-muted">No attendance sessions yet.</p>
             ) : (
               <ul className="flex flex-col divide-y divide-line">
                 {recentSessions.map((session) => (
-                  <li key={session.id} className="flex items-center justify-between gap-4 py-2 first:pt-0 last:pb-0">
+                  <li key={session.id} className="flex items-center justify-between gap-4 py-3 first:pt-1 last:pb-0">
                     <div className="min-w-0">
-                      <p className="truncate text-[15px] text-ink">
+                      <p className="truncate text-[17px] text-ink">
                         {session.courseCode ? `${session.courseCode} — ` : ''}
                         {session.title}
                       </p>
@@ -108,17 +110,17 @@ export function Overview() {
                 ))}
               </ul>
             )}
-          </div>
-          <div>
-            <h3 className="mb-2 text-[13px] font-medium text-muted">Recent records</h3>
+          </section>
+          <section>
+            <h3 className="mb-1 text-[15px] font-semibold text-ink">Recent records</h3>
             {recentRecords.length === 0 ? (
               <p className="text-[13px] text-muted">No attendance records yet.</p>
             ) : (
               <ul className="flex flex-col divide-y divide-line">
                 {recentRecords.map((record) => (
-                  <li key={record.id} className="flex items-center justify-between gap-4 py-2 first:pt-0 last:pb-0">
+                  <li key={record.id} className="flex items-center justify-between gap-4 py-3 first:pt-1 last:pb-0">
                     <div className="min-w-0">
-                      <p className="truncate text-[15px] text-ink">{record.registration_number}</p>
+                      <p className="truncate text-[17px] text-ink">{record.registration_number}</p>
                       <p className="truncate text-[13px] text-muted">
                         {record.sessionTitle ?? 'Unknown session'}
                       </p>
@@ -128,15 +130,15 @@ export function Overview() {
                 ))}
               </ul>
             )}
-          </div>
+          </section>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="px-5 pt-5 sm:px-6">
           <CardTitle>Courses with no sessions this semester</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-5 py-5 sm:px-6">
           {attentionCourses.length === 0 ? (
             <p className="text-[13px] text-muted">
               Every assigned course has at least one session this semester.
@@ -144,8 +146,8 @@ export function Overview() {
           ) : (
             <ul className="flex flex-col divide-y divide-line">
               {attentionCourses.map((course) => (
-                <li key={course.id} className="flex flex-col gap-0.5 py-2 first:pt-0 last:pb-0">
-                  <p className="text-[15px] text-ink">
+                <li key={course.id} className="flex flex-col gap-0.5 py-3 first:pt-1 last:pb-0">
+                  <p className="text-[17px] text-ink">
                     {course.code} — {course.title}
                   </p>
                   <p className="text-[13px] text-muted">
@@ -159,10 +161,10 @@ export function Overview() {
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="px-5 pt-5 sm:px-6">
           <CardTitle>Upcoming lectures</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-5 py-5 sm:px-6">
           <p className="text-[13px] text-muted">
             Timetable integration is not enabled yet, so there are no upcoming lectures to show.
           </p>
