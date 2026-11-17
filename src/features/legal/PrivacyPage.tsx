@@ -52,6 +52,18 @@ export function PrivacyPage({ nav }: { nav: PublicPageNav }) {
               details of the device never leave the phone.
             </li>
             <li>
+              <strong className="font-medium text-ink">Selfie (required):</strong> every student takes a
+              live selfie when submitting — one still photo. It is
+              only used to check the same face is not used for two
+              registration numbers in the same class. The photo is
+              deleted when the session is finalized; only a short
+              code derived from the photo is kept. If a
+              student&apos;s phone has no front camera, the lecturer
+              adds them by hand instead. The photo is never used to
+              identify a student — there are no student photos on
+              file to compare it against.
+            </li>
+            <li>
               <strong className="font-medium text-ink">Headcount:</strong> the number of students the lecturer
               counts in the hall, entered by the lecturer.
             </li>
@@ -91,7 +103,9 @@ export function PrivacyPage({ nav }: { nav: PublicPageNav }) {
           <p className="mt-2">
             Attendance history is kept, because a permanent record is
             the point of the product: a lecturer can look back at any
-            past session. Contact reports are kept until they have
+            past session. Selfie photos are different — they are
+            deleted when the session is finalized, and only the short
+            code derived from the photo is kept. Contact reports are kept until they have
             been handled. If you want your account or your data
             deleted, write to us through the Contact us page and we
             will delete it.
@@ -114,7 +128,11 @@ export function PrivacyPage({ nav }: { nav: PublicPageNav }) {
             holding it. GPS can be faked, and indoor GPS can drift by
             10 to 20 metres, so an honest student at the back of a hall
             can sometimes be refused. A device hash is a deterrent, not
-            proof of identity. A headcount that does not match the
+            proof of identity. A selfie check only catches the same
+            face used for two numbers in one class — it cannot prove
+            the face belongs to the number, and similar faces can be
+            flagged by mistake, which is why a flag is only ever a
+            review. A headcount that does not match the
             submissions only flags a session for the lecturer to
             review — it is never treated as proof of cheating.
           </p>

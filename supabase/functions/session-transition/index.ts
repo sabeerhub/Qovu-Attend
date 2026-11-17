@@ -50,6 +50,15 @@
 // ordinary use: the frontend hides manual/correction controls and
 // the manual-attendance function refuses finalized sessions.
 //
+// Finalization (v0.10.0) also deletes the session's selfie photos:
+// every photo under sessions/<session_id>/ is removed from the
+// private `session-selfies` bucket and `selfie_path` is cleared on
+// the session's records (see selfieCleanup.ts). The hash and the
+// review flag stay — a photo cannot be rebuilt from a hash. If the
+// deletion fails, the finalize still stands (a session cannot be
+// re-finalized) but the failure is reported as a warning on the
+// response, never hidden — photos must not be left behind silently.
+//
 // UNTESTED: this function has not been run against a live Supabase
 // project. Deploy to staging first and exercise every transition
 // (including illegal ones and a non-owner caller) before pilot.
@@ -65,6 +74,11 @@ import {
   jsonResponse,
   sha256Hex,
 } from '../_shared/server.ts';
+import {
+  cleanupSessionSelfies,
+  type SelfieRecordStore,
+  type SelfieStorage,
+} from './selfieCleanup.ts';
 
 type SessionStatus = 'draft' | 'active' | 'closed' | 'finalized' | 'archived';
 
@@ -228,6 +242,23 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return errorResponse('server_error', updateError?.message ?? 'Could not update the session.', 500);
   }
 
+  // Finalize (v0.10.0): photos are deleted after the session.
+  // The finalize stands even if the deletion fails — but the
+  // failure is reported as a warning, never hidden.
+  const warnings: string[] = [];
+  if (target === 'finalized') {
+    const cleanup = await cleanupSessionSelfies(
+      supabase.storage.from('session-selfies') as unknown as SelfieStorage,
+      supabase as unknown as SelfieRecordStore,
+      sessionId,
+    );
+    if (!cleanup.ok) {
+      warnings.push(
+        `Session finalized, but the selfie photos could not be fully deleted: ${cleanup.message} (${cleanup.deleted} photo(s) were deleted before the failure).`,
+      );
+    }
+  }
+
   const { error: auditError } = await supabase.from('attendance_audit_logs').insert({
     session_id: sessionId,
     record_id: null,
@@ -240,17 +271,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (auditError) {
     // The transition already happened; report the audit failure
     // plainly rather than pretending everything is fine.
-    return jsonResponse({
-      ok: true,
-      warning: 'Session moved, but the audit log entry could not be written: ' + auditError.message,
-      session: updated,
-      token,
-      passcode,
-    });
+    warnings.push('Session moved, but the audit log entry could not be written: ' + auditError.message);
   }
 
   return jsonResponse({
     ok: true,
+    ...(warnings.length > 0 ? { warning: warnings.join(' ') } : {}),
     session: updated,
     // Present ONLY on activation, and only in this response.
     token,

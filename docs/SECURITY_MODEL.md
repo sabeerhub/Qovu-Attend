@@ -121,6 +121,51 @@ nothing. Do not treat them as verified until that test has run.
 - No facial liveness in this slice (spec: only after a
   privacy/feasibility review). No student accounts were added.
 
+## Face check — live selfie (Phase 4, v0.10.0)
+
+- **Live selfie (v0.10.0).** After location and device are
+  verified, the student must take a live selfie with the front
+  camera (one still photo, small JPEG, max ~480 px wide) before
+  the final submit. The server also receives the photo's 8x8
+  average hash (16 hex chars, computed on the phone). A submission
+  without a selfie is refused server-side (`selfie_required`) —
+  there is no self-submission without one. If the same hash is
+  submitted for two different registration numbers in the SAME
+  session, both records are flagged for lecturer review — never
+  auto-rejected, never a refusal. The lecturer sees the photo
+  (short-lived signed URL, only for the assigned lecturer) and
+  confirms (record becomes `suspicious`) or dismisses (flag
+  cleared) with a reason; both decisions are audit-logged.
+- **A live selfie is required for self-submission.** A missing /
+  denied camera stops the form with a plain message — it never
+  submits without a photo. A student without a front camera goes
+  to the lecturer, who adds them by hand (manual attendance) —
+  the only fallback, and it needs no selfie.
+- **Photos are deleted after the session.** Photos live in the
+  private `session-selfies` Storage bucket and are deleted when
+  the session is Finalized (`selfie_path` cleared on the records;
+  the hash and the review flag stay). Only the Edge Functions
+  (service role) write or delete photos; lecturers read only their
+  own sessions' photos, enforced by a Storage policy. There is no
+  public access and no direct upload from the client.
+- **Honest limits — read these before trusting the check.** This is
+  NOT face recognition and NOT identity proof:
+  - There are no student photos on file, so the check can never
+    prove the face belongs to the registration number. It only
+    catches the same face used for two numbers in one class.
+  - A similar-looking photo (twins, family, a hash collision, a
+    bad photo) can flag an honest student — which is why a flag is
+    review-only, never a refusal.
+  - An average hash is a rough similarity code, not a face
+    match: the same face in different light, or a different face
+    with a similar layout, can hash the same or differently. It
+    catches the common case (one student submitting for two
+    numbers with the same phone and face); it does not make proxy
+    attendance impossible.
+  - A uniform frame (covered camera, blank wall) carries no face
+    information and runs no duplicate check.
+  - The physical headcount remains the check no phone can fake.
+
 ## Exports
 
 - PDF and CSV exports (Phase 3) must run with the same permission

@@ -141,6 +141,10 @@ export interface SubmitResponse {
   duplicate: boolean;
   retried: boolean;
   record: AttendanceRecord | null;
+  /** True when the same face was used for another number in this session (flagged for lecturer review). */
+  faceReview?: boolean;
+  /** The attendance stands; something secondary (face check, flagging) could not run. */
+  warning?: string;
 }
 
 export interface ManualResponse {
@@ -216,6 +220,15 @@ export interface SubmitAttendanceInput {
    * the hash is ever sent; raw device attributes never leave the phone.
    */
   deviceFingerprint: string;
+  /**
+   * Face check (v0.10.0) — compulsory live selfie. The JPEG bytes
+   * (base64) and the 16-hex-char average hash of the frame. Both
+   * are always sent; the server refuses a submission without them
+   * (`selfie_required`). Students without a front camera are added
+   * by hand by the lecturer instead.
+   */
+  selfie?: string;
+  selfieHash?: string;
 }
 
 /** Public student submission — no auth. At least one of token / passcode is required. */
@@ -289,6 +302,28 @@ export function correctRecord(
   return callFunction<ManualResponse>(
     'manual-attendance',
     { sessionId, recordId, newStatus, reason },
+    { auth: true },
+  );
+}
+
+/**
+ * Lecturer face review (v0.10.0): confirm or dismiss a
+ * `face_review` flag on one record (reason required).
+ * - 'confirm': the lecturer agrees the same face was used for two
+ *   numbers — the record becomes 'suspicious' and the flag clears.
+ * - 'dismiss': the lecturer checked and it is fine — the status
+ *   stays as it was and the flag clears.
+ * Either way the decision is written to the audit log.
+ */
+export function reviewFace(
+  sessionId: string,
+  recordId: string,
+  faceReview: 'confirm' | 'dismiss',
+  reason: string,
+): Promise<EdgeResult<ManualResponse>> {
+  return callFunction<ManualResponse>(
+    'manual-attendance',
+    { sessionId, recordId, faceReview, reason },
     { auth: true },
   );
 }

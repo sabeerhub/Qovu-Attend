@@ -86,11 +86,50 @@ number only.
   number is refused, and one device may submit once per session. A
   per-browser localStorage flag is a UX hint only. Manual attendance
   stays lecturer-attested, with no location/device checks.
+- **Face check — live selfie (v0.10.0, implemented, untested live).**
+  After location and device are verified, the student must take a
+  live selfie before the final submit. The photo is a small
+  JPEG (max ~480 px wide) taken with the front camera; the server
+  also receives its 8x8 average hash (16 hex chars, computed on the
+  phone from the frame's pixels). If the same hash is submitted for
+  two different registration numbers in the SAME session, both
+  records are flagged (`face_review`) for the lecturer to review —
+  never auto-rejected, never a refusal, never a status change. The
+  lecturer sees the photo (short-lived signed URL, only for the
+  assigned lecturer) with the plain words "Same face used for
+  another number in this class — check it", and confirms (record
+  becomes `suspicious`, audit-logged) or dismisses (flag cleared,
+  status unchanged, audit-logged) with a reason.
+- **A live selfie is required for self-submission.** A submission
+  without a selfie is refused server-side (`selfie_required`).
+  There is no way to submit on your own without one. A student
+  whose phone has no front camera, or who cannot use the camera,
+  goes to the lecturer, who adds them by hand (manual attendance)
+  — that is the only fallback, and it needs no photo. A denied or
+  missing camera stops the form with a plain message; it never
+  submits without a photo.
+- **Photos are deleted after the session.** Photos live in the
+  private `session-selfies` Storage bucket under
+  `sessions/<session_id>/<record_id>.jpg`. When a session is
+  Finalized, the photos are deleted and `selfie_path` is cleared on
+  the records; the hash and the review flag stay (a photo cannot be
+  rebuilt from a hash). Only the Edge Functions (service role)
+  write or delete photos; lecturers may read only their own
+  sessions' photos, enforced by a Storage policy.
+- **Honest limit — this is NOT face recognition and NOT identity
+  proof.** There are no student photos on file, so the check can
+  never prove the face belongs to the registration number. It only
+  catches the same face used twice in one session. A similar-looking
+  photo (twins, family, a bad hash collision, a covered camera)
+  can flag an honest student — which is exactly why a flag is
+  review-only. A uniform frame (covered camera, blank wall) has no
+  usable hash and runs no duplicate check.
 - **Honest limits.** GPS can be spoofed with mock-location apps,
   indoor GPS drifts 10–20 m, and a fingerprint is a hashed
   deterrent, not a proof of identity. These checks verify the phone,
-  not the person. No facial liveness in this slice (spec: only after
-  a privacy/feasibility review).
+  not the person. The face check verifies that one face was not
+  used for two numbers in one class — it does not verify who the
+  face belongs to.
 
 ## Lifecycle
 

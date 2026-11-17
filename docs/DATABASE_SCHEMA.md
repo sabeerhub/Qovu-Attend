@@ -197,9 +197,13 @@ itself only restricts the value set.
 | manual_reason | text | required in practice for manual entries (enforced server-side) |
 | idempotency_key | text, nullable | **Phase 2:** stable per-(session, student) key; unique index on `(session_id, idempotency_key)` where not null, so a retried submission returns the original record |
 | device_fingerprint_hash | text, nullable | **Phase 4 (v0.5.0):** SHA-256 hash of the submitting device's fingerprint. Hash only; raw attributes never leave the phone. Null on manual records. Added by `20261116020000_smart_verification.sql` |
+| selfie_path | text, nullable | **Face check (v0.10.0):** Storage path of the compulsory live selfie (`sessions/<session_id>/<record_id>.jpg`, never a public URL). Null on manual records (added by hand by the lecturer, no photo). Deleted (set to null) when the session is Finalized. Added by `20261117060000_face_check.sql` |
+| selfie_hash | text, nullable | **Face check (v0.10.0):** 16-hex-char average hash of the selfie frame. Only the hash is compared server-side; a match for a different number in the same session flags both records for review. Null on manual records. Added by `20261117060000_face_check.sql` |
+| face_review | boolean, nullable | **Face check (v0.10.0):** true when the same selfie hash was used for a different registration number in this session. Review only — never a refusal, never a status change. Cleared by the lecturer (confirm → record becomes `suspicious`; dismiss → status unchanged), audit-logged. Added by `20261117060000_face_check.sql` |
 | submitted_at | timestamptz, default now() | |
 | **unique (session_id, registration_number)** | | **A reg. no. cannot be duplicated within a session** |
 | **unique index (session_id, device_fingerprint_hash) where not null** | | **Phase 4 (v0.5.0): one device, one submission per session** |
+| **index (session_id, selfie_hash) where not null** | | **Face check (v0.10.0): same-face lookup within one session** |
 
 ### device_registrations (Phase 4, v0.5.0)
 First submission binds a device to one registration number, across all sessions.
@@ -213,6 +217,22 @@ First submission binds a device to one registration number, across all sessions.
 RLS is on with no policies: only the Edge Functions (service role) read and write
 this table. The frontend never touches it. Added by
 `20261116020000_smart_verification.sql`.
+
+### session-selfies Storage bucket (Face check, v0.10.0)
+
+Private bucket (`public = false`) for the compulsory live-selfie
+photos. One photo per record, at
+`sessions/<session_id>/<record_id>.jpg`. Only the Edge Functions
+(service role) write or delete photos — there is no insert/update/
+delete policy for authenticated users, so a direct client upload is
+refused. Authenticated lecturers may READ a photo only for a session
+of a course they are assigned to (same ownership rule as courses),
+enforced by the `session_selfies_lecturer_read` policy on
+`storage.objects`; the client fetches a short-lived (60 s) signed
+URL. Photos are deleted when the session is Finalized (see
+`session-transition`); `selfie_path` is cleared on the records, and
+the hash and the review flag stay. Added by
+`20261117060000_face_check.sql`.
 
 ### attendance_audit_logs
 Immutable audit events. No update/delete path is provided in the app.
@@ -278,3 +298,11 @@ updates and deletes only rows for courses they are assigned to
 (course-level assignment, or department-level assignment with a
 null `course_id`) — the same ownership rule as `courses`. Writes go
 through the normal authenticated client under these policies.
+
+v0.10.0 addition (`20261117060000_face_check.sql`): the
+`selfie_path`, `selfie_hash` and `face_review` columns on
+`attendance_records` (see above) and the private
+`session-selfies` Storage bucket (see above). Only the Edge
+Functions (service role) write or delete photos; a lecturer reads
+a photo only for a session of a course they are assigned to
+(`session_selfies_lecturer_read` policy on `storage.objects`).

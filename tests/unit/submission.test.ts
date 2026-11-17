@@ -24,6 +24,9 @@ function record(reg: string, status: AttendanceRecord['status'] = 'verified'): A
     manual_reason: null,
     idempotency_key: null,
     device_fingerprint_hash: null,
+    selfie_path: null,
+    selfie_hash: null,
+    face_review: null,
     submitted_at: '2026-11-15T10:00:00.000Z',
   };
 }

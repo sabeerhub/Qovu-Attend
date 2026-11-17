@@ -43,6 +43,7 @@ export function TermsPage({ nav }: { nav: PublicPageNav }) {
           <ul className="mt-2 list-disc pl-5">
             <li>One device marks one registration number per session.</li>
             <li>Location must be on to submit attendance. Without it, there is no attendance.</li>
+            <li>A live selfie is required to submit attendance. It is only used to check the same face is not used for two numbers in the same class, and it is deleted when the session is finalized. If your phone has no front camera, your lecturer will add you by hand.</li>
             <li>Do not submit attendance for someone else, and do not share a QR code or passcode with someone outside the hall.</li>
           </ul>
         </section>

@@ -10,7 +10,7 @@ import {
   validateCorrection,
   validateManualAttendance,
 } from '@/lib/submission';
-import { correctRecord, manualAdd, transitionSession } from '@/lib/edgeFunctions';
+import { correctRecord, manualAdd, reviewFace, transitionSession } from '@/lib/edgeFunctions';
 import { QrDisplay } from './QrDisplay';
 import { LocationAllowPanel, LocationBlockedPanel } from '@/components/ui/location-permission';
 import { StatusBadge } from '@/components/ui/badge';
@@ -109,13 +109,25 @@ export function SessionMonitor({
   const [correctError, setCorrectError] = useState<string | null>(null);
   const [correctBusy, setCorrectBusy] = useState(false);
 
+  // Face review (v0.10.0): flagged records show the photo (a
+  // short-lived signed URL, only for the assigned lecturer) and a
+  // confirm/dismiss form. Photos are deleted at Finalize, so a
+  // finalized session's flag has no photo left to show.
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
+  const [photoLoadingId, setPhotoLoadingId] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [faceReviewId, setFaceReviewId] = useState<string | null>(null);
+  const [faceReviewReason, setFaceReviewReason] = useState('');
+  const [faceReviewError, setFaceReviewError] = useState<string | null>(null);
+  const [faceReviewBusy, setFaceReviewBusy] = useState(false);
+
   const loadRecords = useCallback(async () => {
     if (!supabase) return;
     setRecordsState({ status: 'loading' });
     try {
       const { data, error } = await supabase
         .from('attendance_records')
-        .select('id, session_id, registration_number, student_name, status, verification_method, manual_reason, idempotency_key, submitted_at')
+        .select('id, session_id, registration_number, student_name, status, verification_method, manual_reason, idempotency_key, submitted_at, selfie_path, selfie_hash, face_review')
         .eq('session_id', session.id)
         .order('submitted_at', { ascending: true });
       if (error) setRecordsState({ status: 'error', message: error.message });
@@ -281,6 +293,48 @@ export function SessionMonitor({
     void loadRecords();
   }
 
+  async function loadPhoto(record: AttendanceRecord) {
+    if (!supabase || !record.selfie_path) return;
+    if (photoUrls[record.id]) return;
+    setPhotoLoadingId(record.id);
+    setPhotoError(null);
+    const { data, error } = await supabase.storage
+      .from('session-selfies')
+      .createSignedUrl(record.selfie_path, 60);
+    setPhotoLoadingId(null);
+    if (error || !data?.signedUrl) {
+      setPhotoError('Could not load the photo. Try again.');
+      return;
+    }
+    setPhotoUrls((urls) => ({ ...urls, [record.id]: data.signedUrl }));
+  }
+
+  async function onFaceReview(record: AttendanceRecord, decision: 'confirm' | 'dismiss') {
+    if (faceReviewReason.trim().length === 0) {
+      setFaceReviewError('Enter a reason for the review. Every review is recorded in the audit log.');
+      return;
+    }
+    setFaceReviewError(null);
+    setFaceReviewBusy(true);
+    const result = await reviewFace(session.id, record.id, decision, faceReviewReason.trim());
+    setFaceReviewBusy(false);
+    if (!result.ok) {
+      setFaceReviewError(result.error.message);
+      return;
+    }
+    setFaceReviewId(null);
+    setFaceReviewReason('');
+    setNotice({
+      kind: 'success',
+      text:
+        result.data.warning ??
+        (decision === 'confirm'
+          ? 'Face review confirmed — the record is now suspicious and recorded in the audit log.'
+          : 'Face review dismissed — the flag is cleared and recorded in the audit log.'),
+    });
+    void loadRecords();
+  }
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -388,6 +442,20 @@ export function SessionMonitor({
                 evidence of fraud.
               </p>
             ) : null}
+            {records.filter((r) => r.face_review).length > 0 ? (
+              <p
+                className="mt-3 rounded-lg border border-line bg-canvas px-3 py-2 text-[13px] text-ink"
+                role="status"
+              >
+                <span className="font-medium">
+                  {records.filter((r) => r.face_review).length} record
+                  {records.filter((r) => r.face_review).length === 1 ? '' : 's'} flagged for
+                  face review.
+                </span>{' '}
+                The same face was used for another number in this class. Check the flagged
+                records in the list below — a flag is a review, not proof of cheating.
+              </p>
+            ) : null}
           </>
         )}
       </section>
@@ -426,7 +494,91 @@ export function SessionMonitor({
             <tbody>
               {records.map((record) => (
                 <tr key={record.id} className="border-b border-line align-top last:border-b-0">
-                  <td className="py-3 pr-4 text-ink">{record.registration_number}</td>
+                  <td className="py-3 pr-4 text-ink">
+                    {record.registration_number}
+                    {record.face_review ? (
+                      <span className="mt-2 block max-w-xs rounded-lg border border-line bg-canvas px-3 py-2 text-[13px] text-ink">
+                        <span className="font-medium">
+                          Same face used for another number in this class — check it.
+                        </span>{' '}
+                        This is a flag to review, not proof of cheating: similar faces
+                        can be flagged by mistake.
+                        {record.selfie_path ? (
+                          photoUrls[record.id] ? (
+                            <img
+                              src={photoUrls[record.id]}
+                              alt={`Selfie for ${record.registration_number}`}
+                              className="mt-2 w-40 rounded-lg"
+                            />
+                          ) : (
+                            <span className="mt-2 block">
+                              <Button
+                                variant="secondary"
+                                disabled={photoLoadingId === record.id}
+                                onClick={() => void loadPhoto(record)}
+                              >
+                                {photoLoadingId === record.id ? 'Loading photo…' : 'View photo'}
+                              </Button>
+                              {photoError ? (
+                                <span className="mt-1 block text-danger">{photoError}</span>
+                              ) : null}
+                            </span>
+                          )
+                        ) : (
+                          <span className="mt-1 block text-muted">
+                            The photo was deleted when the session was finalized.
+                          </span>
+                        )}
+                        {editable ? (
+                          faceReviewId === record.id ? (
+                            <span className="mt-3 block">
+                              <label className="flex flex-col gap-1.5 text-[13px] font-medium text-ink">
+                                Reason (required)
+                                <Input
+                                  value={faceReviewReason}
+                                  onChange={(e) => setFaceReviewReason(e.target.value)}
+                                  placeholder="What did you check?"
+                                />
+                              </label>
+                              {faceReviewError ? (
+                                <span className="mt-1 block text-danger" role="alert">
+                                  {faceReviewError}
+                                </span>
+                              ) : null}
+                              <span className="mt-2 flex flex-wrap gap-2">
+                                <Button
+                                  disabled={faceReviewBusy}
+                                  onClick={() => void onFaceReview(record, 'confirm')}
+                                >
+                                  {faceReviewBusy ? 'Saving…' : 'Confirm — same face'}
+                                </Button>
+                                <Button
+                                  variant="secondary"
+                                  disabled={faceReviewBusy}
+                                  onClick={() => void onFaceReview(record, 'dismiss')}
+                                >
+                                  Dismiss — checked, fine
+                                </Button>
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="mt-2 block">
+                              <Button
+                                variant="secondary"
+                                onClick={() => {
+                                  setFaceReviewId(record.id);
+                                  setFaceReviewReason('');
+                                  setFaceReviewError(null);
+                                }}
+                              >
+                                Review this flag
+                              </Button>
+                            </span>
+                          )
+                        ) : null}
+                      </span>
+                    ) : null}
+                  </td>
                   <td className="py-3 pr-4">
                     <StatusBadge status={record.status} />
                     {record.manual_reason ? (

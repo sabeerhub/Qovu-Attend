@@ -178,7 +178,9 @@ Request:
   "latitude": 11.7594,
   "longitude": 9.3392,
   "accuracy": 12,
-  "deviceFingerprint": "<64-hex sha256>"
+  "deviceFingerprint": "<64-hex sha256>",
+  "selfie": "<base64 jpeg, required>",
+  "selfieHash": "<16-hex average hash, required>"
 }
 ```
 
@@ -234,6 +236,33 @@ runs identically on the QR-token path and the passcode path. It runs
 after idempotency on purpose, so a retried submission still returns
 its original record.
 
+Face check (v0.10.0) — the compulsory live selfie. The request
+must carry `selfie` (a small JPEG, base64, at most ~225 KB) and
+`selfieHash` (the 16-hex-char average hash of the frame) — both
+are required; a submission without them is `400 selfie_required`
+("Take a live selfie to submit your attendance. If you have no
+front camera, ask your lecturer to add you."). The check runs
+after the idempotency check, so a retried submission still returns
+its original record, and before any photo upload or record insert
+— a refused submission stores no photo. A photo without its hash,
+or a hash without its photo, is `400 invalid_request`, as is a
+photo that is not a JPEG or is too large. The photo is validated
+after the session/token check and stored in the private
+`session-selfies` bucket
+(`sessions/<session_id>/<record_id>.jpg`) ONLY after every refusal
+check has passed — a refused submission stores no photo. After the
+insert, the server looks for another record in the SAME session
+with the same hash for a DIFFERENT registration number; a match
+sets `face_review` on both records — never a rejection, never a
+status change. The success response then carries
+`"faceReview": true`. Students whose phone has no front camera,
+or who cannot use the camera, are added by hand by the lecturer
+(manual attendance) — the only fallback, and it needs no selfie.
+This is NOT face recognition and NOT identity proof: there are no
+student photos on file, so it can never prove the face belongs to
+the number. See `docs/ATTENDANCE_RULES.md` and
+`docs/SECURITY_MODEL.md`.
+
 Success (200):
 
 ```json
@@ -251,7 +280,8 @@ Errors:
 
 | HTTP | code | Meaning |
 |---|---|---|
-| 400 | `invalid_request` | Missing registrationNumber, or neither sessionId nor passcode supplied; or a malformed fingerprint / accuracy |
+| 400 | `invalid_request` | Missing registrationNumber, or neither sessionId nor passcode supplied; or a malformed fingerprint / accuracy; or a selfie sent without its hash (or the reverse), a non-JPEG selfie, or an oversized selfie |
+| 400 | `selfie_required` | No live selfie supplied — a selfie is required to submit; students without a front camera are added by hand by the lecturer |
 | 400 | `location_required` | No student coordinates supplied — location is mandatory |
 | 400 | `location_too_imprecise` | Reported accuracy worse than 100 m |
 | 401 | `invalid_token` | Token/passcode hash does not match the session; in the passcode-only flow also when zero or more than one active session matches the passcode; the `validate` action also answers this when the code is expired or its session has no anchor |
@@ -311,6 +341,12 @@ status, reason, lecturer, timestamp). A failure to write the audit row
 is reported as a `warning` in an otherwise successful response, never
 hidden.
 
+Finalize (v0.10.0): a transition to `finalized` also deletes the
+session's selfie photos from the private `session-selfies` bucket
+and clears `selfie_path` on the session's records (the hash and the
+review flag stay). If the deletion fails, the finalize still stands
+but the failure is reported as a `warning`, never hidden.
+
 Errors:
 
 | HTTP | code | Meaning |
@@ -326,7 +362,7 @@ Errors:
 
 Route: `POST <your Supabase project URL>/functions/v1/manual-attendance`.
 Requires the lecturer's JWT and session ownership (as above).
-Finalized / archived sessions are read-only: both shapes are refused.
+Finalized / archived sessions are read-only: all shapes are refused.
 
 Manual add — request:
 
@@ -346,17 +382,33 @@ Correction — request:
 ```
 
 `newStatus` must be one of `verified | manual | pending | rejected |
-suspicious`. Exactly one of the two shapes is accepted per call.
+suspicious`.
 
-Success (200): `{ "ok": true, "record": { … } }`. Both shapes write
-an `attendance_audit_logs` row (`action: "manual_attendance"` or
-`"correction"`, previous/new status, reason, lecturer, timestamp); an
-audit-write failure is reported as a `warning`, never hidden.
+Face review (v0.10.0) — request:
 
-Errors: 400 `invalid_request` (missing reason, both/neither shape,
-invalid `newStatus`), 401 `unauthorized`, 403 `forbidden`, 404
-`session_not_found` / `record_not_found`, 409 `session_read_only`
-(finalized/archived) or `duplicate_registration` (manual add).
+```json
+{ "sessionId": "uuid", "recordId": "uuid", "faceReview": "confirm", "reason": "Same face as FUT/2022/001, checked the photos" }
+```
+
+`faceReview` is `confirm` or `dismiss`. Confirm means the lecturer
+agrees the same face was used for two numbers — the record becomes
+`suspicious` and the flag is cleared. Dismiss means the lecturer
+checked and it is fine — the status stays as it was and the flag is
+cleared. A record that is not flagged is refused with 409
+`face_review_not_flagged`. Exactly one of the three shapes is
+accepted per call.
+
+Success (200): `{ "ok": true, "record": { … } }`. All shapes write
+an `attendance_audit_logs` row (`action: "manual_attendance"`,
+`"correction"`, `"face_review_confirmed"` or
+`"face_review_dismissed"`, previous/new status, reason, lecturer,
+timestamp); an audit-write failure is reported as a `warning`, never hidden.
+
+Errors: 400 `invalid_request` (missing reason, more than one shape
+or none, invalid `newStatus` or `faceReview`), 401 `unauthorized`,
+403 `forbidden`, 404 `session_not_found` / `record_not_found`, 409
+`session_read_only` (finalized/archived), `duplicate_registration`
+(manual add) or `face_review_not_flagged` (face review).
 
 ### `contact-notify` — email one saved contact report to the owner (v0.8.3, no auth)
 

@@ -7,9 +7,9 @@ documented paths before pilot.
 
 | Function | Purpose |
 |---|---|
-| `attendance-submit` | Public student submission: validate session state, QR token / passcode hash + server-side expiry, roster (class-list) check — a number not on a non-empty course list is refused (`reg_number_not_registered`); an empty list accepts anyone — enforce uniqueness + idempotency, derive status server-side. No student account. |
-| `session-transition` | Lecturer lifecycle transitions with ownership check + audit logging. Generates the QR token + passcode on activation (hashes only are stored). |
-| `manual-attendance` | Lecturer manual add + record correction, both reason-required and audit-logged. Refuses finalized / archived sessions. |
+| `attendance-submit` | Public student submission: validate session state, QR token / passcode hash + server-side expiry, roster (class-list) check — a number not on a non-empty course list is refused (`reg_number_not_registered`); an empty list accepts anyone — enforce uniqueness + idempotency, derive status server-side. Compulsory live selfie (v0.10.0): a submission without a selfie is refused (`selfie_required`); stores the photo in the private `session-selfies` bucket + its average hash, and flags same-face-different-number records for lecturer review (never a rejection). No student account. |
+| `session-transition` | Lecturer lifecycle transitions with ownership check + audit logging. Generates the QR token + passcode on activation (hashes only are stored). Finalize (v0.10.0) deletes the session's selfie photos and clears `selfie_path` on its records. |
+| `manual-attendance` | Lecturer manual add + record correction, both reason-required and audit-logged. Refuses finalized / archived sessions. Face review (v0.10.0): confirm (record becomes `suspicious`) or dismiss a `face_review` flag, reason-required and audit-logged. |
 | `contact-notify` | Emails one saved contact report to the owner via Resend (premium HTML + plain text, PNG logo). Called fire-and-forget by the contact form after the report saves. Needs the `RESEND_API_KEY` secret (set by the owner in the Supabase dashboard); the recipient is `mustaphaabdulsalam1666@gmail.com` unless the `CONTACT_REPORT_EMAIL` secret overrides it. |
 
 Shared helpers live in `_shared/server.ts` (service-role client,

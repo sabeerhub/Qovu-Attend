@@ -76,6 +76,28 @@
 //   10. Record inserted with status 'verified' and verification_method
 //      'qr' or 'passcode', derived server-side, plus the device
 //      fingerprint hash.
+//   11. Face check (v0.10.0, compulsory — the selfie is required
+//      for self-submission): a submission MUST carry a live selfie
+//      (small JPEG, base64) and its 16-hex-char average hash (see
+//      faceCheck.ts). A submission without one is refused (400
+//      selfie_required) — there is no self-submission without a
+//      selfie. Students whose phone has no front camera, or who
+//      cannot use the camera, are added by hand by the lecturer
+//      (manual attendance), which is the only fallback and needs
+//      no selfie. The check runs AFTER the idempotency check, so a
+//      retried submission still returns its original record, and
+//      BEFORE any photo upload or record insert — a refused
+//      submission stores no photo. The photo is validated AFTER
+//      the session/token check and stored in the private
+//      `session-selfies` bucket ONLY after every refusal check has
+//      passed. After the insert, the server looks for another
+//      record in the SAME session with the same hash for a
+//      DIFFERENT registration number; a match sets `face_review`
+//      on both records — never a rejection, never a status change.
+//      The lecturer reviews the flag in the session workspace.
+//      This is NOT face recognition and NOT identity proof: there
+//      are no student photos on file, so it can never prove the
+//      face belongs to the number.
 //
 // Rate limiting: a small in-memory per-session window (300 submissions
 // per session per minute — a full lecture hall scanning at once).
@@ -113,6 +135,12 @@ import {
   type PasscodeSessionQuery,
 } from './resolveSession.ts';
 import { checkRosterMembership, type RosterQuery } from './rosterCheck.ts';
+import {
+  findFaceDuplicates,
+  flagFaceReview,
+  parseSelfieInput,
+  type FaceCheckQuery,
+} from './faceCheck.ts';
 import { createValidateRateLimiter } from './validateRateLimit.ts';
 
 // --- Best-effort in-memory rate limit (see header note) ---
@@ -160,6 +188,10 @@ type SubmitBody = {
   longitude?: unknown;
   accuracy?: unknown;
   deviceFingerprint?: unknown;
+  /** Required live selfie (v0.10.0): small JPEG, base64. */
+  selfie?: unknown;
+  /** Required 16-hex-char average hash of the selfie. */
+  selfieHash?: unknown;
 };
 
 const FINGERPRINT_RE = /^[0-9a-f]{64}$/;
@@ -362,13 +394,26 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (idempotencyKey) {
     const { data: existing } = await supabase
       .from('attendance_records')
-      .select('id, session_id, registration_number, status, verification_method, submitted_at')
+      .select('id, session_id, registration_number, status, verification_method, submitted_at, selfie_path, selfie_hash, face_review')
       .eq('session_id', sessionId)
       .eq('idempotency_key', idempotencyKey)
       .maybeSingle();
     if (existing) {
       return jsonResponse({ ok: true, duplicate: true, retried: true, record: existing });
     }
+  }
+
+  // 11 (required). Face check (v0.10.0): a live selfie is
+  // compulsory for self-submission — a submission without a selfie
+  // (or with a malformed one) is refused here with
+  // `selfie_required`. This runs AFTER idempotency on purpose, so
+  // a retried submission still returns its original record, and
+  // BEFORE any photo upload or record insert, so a refused
+  // submission stores no photo. The photo itself is stored much
+  // later, only after every refusal check has passed.
+  const selfieInput = parseSelfieInput(body.selfie, body.selfieHash);
+  if (!selfieInput.ok) {
+    return errorResponse(selfieInput.code, selfieInput.message, 400);
   }
 
   // 6. Roster (v0.9.0): the number must be on the course's class
@@ -472,18 +517,42 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
   }
 
-  // 9 + 10. Insert; the unique constraints are the duplicate backstops.
+  // 9 + 10 + 11. Insert; the unique constraints are the duplicate backstops.
+  // The record id is generated here so the selfie path can name it
+  // before the insert: sessions/<session_id>/<record_id>.jpg.
+  const recordId = crypto.randomUUID();
+  let selfiePath: string | null = null;
+  if (selfieInput.ok && selfieInput.present) {
+    // Every refusal check has passed by now — only a submission
+    // that is actually being recorded stores a photo. If the
+    // upload fails, nothing is recorded at all: the student retries
+    // (the idempotency key is stable), and no record is ever left
+    // claiming a selfie that is not stored.
+    selfiePath = `sessions/${sessionId}/${recordId}.jpg`;
+    const { error: uploadError } = await supabase.storage
+      .from('session-selfies')
+      .upload(selfiePath, selfieInput.bytes, {
+        contentType: 'image/jpeg',
+        upsert: false,
+      });
+    if (uploadError) {
+      return errorResponse('server_error', uploadError.message, 500);
+    }
+  }
   const { data: record, error: insertError } = await supabase
     .from('attendance_records')
     .insert({
+      id: recordId,
       session_id: sessionId,
       registration_number: registrationNumber,
       status: 'verified',
       verification_method: verificationMethod,
       idempotency_key: idempotencyKey || null,
       device_fingerprint_hash: deviceFingerprint,
+      selfie_path: selfiePath,
+      selfie_hash: selfieInput.ok && selfieInput.present ? selfieInput.hash : null,
     })
-    .select('id, session_id, registration_number, status, verification_method, submitted_at')
+    .select('id, session_id, registration_number, status, verification_method, submitted_at, selfie_path, selfie_hash, face_review')
     .single();
 
   if (insertError) {
@@ -504,7 +573,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     if ((insertError as { code?: string }).code === '23505') {
       const { data: existing } = await supabase
         .from('attendance_records')
-        .select('id, session_id, registration_number, status, verification_method, submitted_at')
+        .select('id, session_id, registration_number, status, verification_method, submitted_at, selfie_path, selfie_hash, face_review')
         .eq('session_id', sessionId)
         .eq('registration_number', registrationNumber)
         .maybeSingle();
@@ -514,6 +583,48 @@ Deno.serve(async (req: Request): Promise<Response> => {
       );
     }
     return errorResponse('server_error', insertError.message, 500);
+  }
+
+  // 11 (duplicate check). Same face, different number, same
+  // session: flag BOTH records for lecturer review. Never a
+  // rejection, never a status change. If the flagging itself fails,
+  // the attendance still stands — the failure is reported as a
+  // warning, not hidden.
+  if (selfieInput.ok && selfieInput.present) {
+    const duplicates = await findFaceDuplicates(
+      supabase as unknown as FaceCheckQuery,
+      sessionId,
+      selfieInput.hash,
+      registrationNumber,
+    );
+    if (!duplicates.ok) {
+      return jsonResponse({
+        ok: true,
+        duplicate: false,
+        record,
+        warning: 'Attendance recorded, but the face check could not run: ' + duplicates.message,
+      });
+    }
+    if (duplicates.duplicates.length > 0) {
+      const flagged = await flagFaceReview(
+        supabase as unknown as FaceCheckQuery,
+        [record.id, ...duplicates.duplicates.map((d) => d.id)],
+      );
+      if (!flagged.ok) {
+        return jsonResponse({
+          ok: true,
+          duplicate: false,
+          record,
+          warning: 'Attendance recorded, but the face-review flag could not be saved: ' + flagged.message,
+        });
+      }
+      return jsonResponse({
+        ok: true,
+        duplicate: false,
+        record: { ...record, face_review: true },
+        faceReview: true,
+      });
+    }
   }
 
   return jsonResponse({ ok: true, duplicate: false, record }, 200);

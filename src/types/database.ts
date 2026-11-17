@@ -174,6 +174,25 @@ export interface AttendanceRecord {
    * manual records (lecturer-attested, no device check).
    */
   device_fingerprint_hash: string | null;
+  /**
+   * Face check (v0.10.0) — live selfie, optional. The Storage path
+   * of the photo (sessions/<session_id>/<record_id>.jpg, never a
+   * public URL) and the 16-hex-char average hash of the frame.
+   * Both are null on records submitted without a photo and on
+   * manual records. The photo is deleted when the session is
+   * Finalized and `selfie_path` is cleared; the hash and the
+   * review flag stay.
+   */
+  selfie_path: string | null;
+  selfie_hash: string | null;
+  /**
+   * Face check (v0.10.0) — true when the same selfie hash was used
+   * for a different registration number in this session. Review
+   * only: it never rejects a submission and never changes a status
+   * on its own. The lecturer confirms or dismisses it in the
+   * session workspace. Null means "not flagged".
+   */
+  face_review: boolean | null;
   submitted_at: string;
 }
 

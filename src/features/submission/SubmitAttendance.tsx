@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { QovuBrand } from '@/components/brand/QovuBrand';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/empty-state';
+import { SelfieStep } from './SelfieStep';
+import type { CapturedSelfie } from '@/lib/selfieCapture';
 
 /**
  * Public attendance submission — no student account, no sign-in.
@@ -34,6 +36,12 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/ui/empty-stat
  * hash only) binds one device to one registration number,
  * server-side. Both checks apply identically to the QR-token path
  * and the passcode path.
+ *
+ * Face check (v0.10.0): after location and device are verified,
+ * the student MUST take a live selfie before the final submit —
+ * there is no way to submit without one. A missing or denied
+ * camera stops the form with a plain message, and the student
+ * goes to the lecturer, who adds them by hand.
  */
 export function SubmitAttendance(props?: { passcode?: string }) {
   const urlParams = typeof window !== 'undefined' ? getSubmitParams(window.location.search) : null;
@@ -47,10 +55,23 @@ export function SubmitAttendance(props?: { passcode?: string }) {
   const [passcode, setPasscode] = useState(props?.passcode ?? '');
   const [state, setState] = useState<
     | { status: 'form' }
+    | { status: 'selfie' }
     | { status: 'submitting' }
     | { status: 'success'; registrationNumber: string; duplicate: boolean; retried: boolean }
     | { status: 'error'; code: string; message: string }
   >({ status: 'form' });
+  // Location + device are checked BEFORE the selfie step, so the
+  // photo is only taken once the submission is otherwise ready
+  // to go. Held here until the student takes the photo.
+  const [pendingSubmit, setPendingSubmit] = useState<null | {
+    registrationNumber: string;
+    passcode: string;
+    idempotencyKey: string;
+    latitude: number;
+    longitude: number;
+    accuracy: number | null;
+    deviceFingerprint: string;
+  }>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
   // Location permission gate (v0.5.1): the browser is asked to
@@ -180,19 +201,13 @@ export function SubmitAttendance(props?: { passcode?: string }) {
       });
       return;
     }
-    setProgress('Submitting your attendance…');
-    const result = await submitAttendance({
-      // Passcode-only (v0.5.4): no session id — the server resolves
-      // the session from the passcode hash. The key is omitted from
-      // the JSON body when undefined.
-      sessionId: sessionId ?? undefined,
+    // Face check (v0.10.0): location and device are done, so the
+    // student takes the compulsory live selfie BEFORE the final
+    // submit. Without a photo there is no submission.
+    setProgress(null);
+    setPendingSubmit({
       registrationNumber: normalized,
-      token: token ?? undefined,
-      passcode: token ? undefined : trimmedPasscode,
-      // Without a session id the stable per-(session, student) key
-      // cannot be built; use an attempt-scoped key instead. A retry
-      // is still deduplicated server-side by the unique constraint
-      // on (session_id, registration_number).
+      passcode: trimmedPasscode,
       idempotencyKey: sessionId
         ? buildIdempotencyKey(sessionId, normalized)
         : newIdempotencyKey(),
@@ -201,15 +216,48 @@ export function SubmitAttendance(props?: { passcode?: string }) {
       accuracy: location.coords.accuracy,
       deviceFingerprint,
     });
+    setState({ status: 'selfie' });
+  }
+
+  async function finishSubmit(selfie: CapturedSelfie) {
+    if (!urlParams && !passcodeOnly) return;
+    if (!pendingSubmit) return;
+    setState({ status: 'submitting' });
+    setProgress('Submitting your attendance…');
+    const result = await submitAttendance({
+      // Passcode-only (v0.5.4): no session id — the server resolves
+      // the session from the passcode hash. The key is omitted from
+      // the JSON body when undefined.
+      sessionId: sessionId ?? undefined,
+      registrationNumber: pendingSubmit.registrationNumber,
+      token: token ?? undefined,
+      passcode: token ? undefined : pendingSubmit.passcode,
+      // Without a session id the stable per-(session, student) key
+      // cannot be built; use an attempt-scoped key instead. A retry
+      // is still deduplicated server-side by the unique constraint
+      // on (session_id, registration_number).
+      idempotencyKey: pendingSubmit.idempotencyKey,
+      latitude: pendingSubmit.latitude,
+      longitude: pendingSubmit.longitude,
+      accuracy: pendingSubmit.accuracy,
+      deviceFingerprint: pendingSubmit.deviceFingerprint,
+      // Face check (v0.10.0): the compulsory live selfie. The
+      // server refuses a submission without it
+      // (`selfie_required`), so the photo and its hash are always
+      // sent here.
+      selfie: selfie.jpegBase64,
+      selfieHash: selfie.hash,
+    });
     setProgress(null);
+    setPendingSubmit(null);
     if (!result.ok) {
       setState({ status: 'error', code: result.error.code, message: result.error.message });
       return;
     }
-    if (sessionId) writeSubmittedFlag(sessionId, normalized);
+    if (sessionId) writeSubmittedFlag(sessionId, pendingSubmit.registrationNumber);
     setState({
       status: 'success',
-      registrationNumber: normalized,
+      registrationNumber: pendingSubmit.registrationNumber,
       duplicate: result.data.duplicate,
       retried: result.data.retried,
     });
@@ -222,7 +270,9 @@ export function SubmitAttendance(props?: { passcode?: string }) {
       </h1>
       <p className="mt-1 text-[13px] text-muted">Attendance submission</p>
 
-      {state.status === 'submitting' ? (
+      {state.status === 'selfie' ? (
+        <SelfieStep onDone={(selfie) => void finishSubmit(selfie)} />
+      ) : state.status === 'submitting' ? (
         <div className="mt-6">
           <LoadingState label={progress ?? 'Submitting your attendance…'} />
         </div>
@@ -274,7 +324,10 @@ export function SubmitAttendance(props?: { passcode?: string }) {
           <p className="text-[13px] text-muted">
             Enter your registration number to record attendance for this session. No account is
             needed. Your location is required — attendance is only recorded while you are in
-            the lecture hall — and one device can only submit for one student.
+            the lecture hall — and one device can only submit for one student. After that you
+            must take a live selfie: it stops one student submitting for another. The photo is
+            deleted after the session. If your phone has no front camera, your lecturer will
+            add you by hand.
           </p>
           {browserFlag ? (
             <p className="rounded-lg border border-line bg-canvas px-3 py-2 text-[13px] text-muted" role="status">
