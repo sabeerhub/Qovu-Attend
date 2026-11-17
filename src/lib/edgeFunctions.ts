@@ -243,6 +243,29 @@ export function validatePasscode(
   );
 }
 
+export interface NotifyContactReportResponse {
+  ok: true;
+  sent: true;
+  id: string;
+  duplicate?: boolean;
+}
+
+/**
+ * Ask the server to email one saved contact report to the owner
+ * (v0.8.3) — no auth. The function re-reads the report by id and
+ * sends the premium email via Resend. Fire-and-forget from the
+ * contact form: the email must never fail the report.
+ */
+export function notifyContactReport(
+  reportId: string,
+): Promise<EdgeResult<NotifyContactReportResponse>> {
+  return callFunction<NotifyContactReportResponse>(
+    'contact-notify',
+    { reportId },
+    { auth: false },
+  );
+}
+
 /** Lecturer manual add (registration number + reason, both required). */
 export function manualAdd(
   sessionId: string,

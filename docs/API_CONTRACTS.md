@@ -343,6 +343,83 @@ invalid `newStatus`), 401 `unauthorized`, 403 `forbidden`, 404
 `session_not_found` / `record_not_found`, 409 `session_read_only`
 (finalized/archived) or `duplicate_registration` (manual add).
 
+### `contact-notify` — email one saved contact report to the owner (v0.8.3, no auth)
+
+Route: `POST <your Supabase project URL>/functions/v1/contact-notify`.
+No Authorization header / account required — the contact form is
+public. The caller supplies ONLY the report id; the function
+re-reads the report row server-side (service-role client) and sends
+one premium HTML + plain-text email via Resend to the owner. The
+client never supplies the name, email or message for the email.
+
+Request:
+
+```json
+{ "reportId": "uuid" }
+```
+
+The server checks, in order:
+
+1. `reportId` is a UUID (anything else: 400 `invalid_request`,
+   nothing sent).
+2. `RESEND_API_KEY` is configured (missing: 500 `not_configured`,
+   nothing sent). The key lives only in the Edge Function
+   environment (Supabase dashboard secret, set by the owner) — it
+   is never in the repo and never sent to the client.
+3. The report row exists (missing: 404 `not_found`, nothing sent).
+4. Freshness: the row must be under 10 minutes old (older: 410
+   `report_too_old`, nothing sent). A replayed id from hours ago
+   can never trigger an email.
+5. One email per report id per function instance (best-effort
+   in-memory set — the same honesty note as the other in-memory
+   guards in this codebase: it resets when the instance is
+   recycled, and it is NOT a production-grade distributed dedup. A
+   replayed call returns the original Resend id with
+   `duplicate: true` and sends nothing new).
+
+The email (built by `supabase/functions/contact-notify/email.ts`):
+from `Qovu <onboarding@resend.dev>` (Resend free-tier sender — no
+custom domain yet); to `mustaphaabdulsalam1666@gmail.com`, or the
+`CONTACT_REPORT_EMAIL` secret when set; subject `New Qovu report:
+<Report a problem | Question | Feedback>`. The HTML is a 600px
+centred container, white background, ink text, one accent blue —
+header with the PNG Qovu logo and wordmark, an accent-blue topic
+badge, the reporter's name and email, the message inside a canvas
+`#f5f5f7` box, the received time, and a small footer ("Sent from
+Qovu — Attendance, verified."). Gmail and most email clients do NOT
+render SVG images, so the header image is the PNG logo
+(`https://uniattend-x.vercel.app/apple-touch-icon.png`) — never
+`logo.svg`. ALL user content (name, email, message) is escaped
+before it is placed in the HTML, so a report containing markup
+arrives as harmless text, never as markup. A plain-text part is
+sent alongside the HTML.
+
+Success (200): `{ "ok": true, "sent": true, "id": "<resend message id>" }`
+(`"duplicate": true` on a replayed call — same Resend id, no new
+email sent).
+
+Errors:
+
+| HTTP | code | Meaning |
+|---|---|---|
+| 400 | `invalid_request` | Missing or non-UUID reportId |
+| 400 | `invalid_body` | Request body is not valid JSON |
+| 404 | `not_found` | No such report |
+| 405 | `method_not_allowed` | Not a POST |
+| 410 | `report_too_old` | Report is older than 10 minutes — it can no longer trigger an email |
+| 500 | `not_configured` | `RESEND_API_KEY` (or the Supabase connection) is not configured |
+| 500 | `server_error` | The report row could not be read |
+| 502 | `email_failed` | Resend refused the email, or could not be reached |
+
+The contact form (`/contact`) calls this function fire-and-forget
+after the report saves: the report id is generated client-side (a
+random UUID) and included in the insert, because there is
+deliberately no public SELECT policy on `contact_reports` and the
+client therefore cannot read the id back. If the function is
+unreachable, errors, or the email fails, the report stays saved and
+the user still sees the normal success message — the email must
+never fail the report. The outcome is only logged to the console.
+
 ## Edge Functions (Phase 3, planned — not implemented)
 
 | Function | Purpose |

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { supabase } from '@/lib/supabase';
+import { notifyContactReport } from '@/lib/edgeFunctions';
 import {
   CONTACT_TOPICS,
   isContactTopic,
@@ -19,6 +20,15 @@ import { PublicPageLayout, type PublicPageNav } from '@/components/layout/Public
  * public read). There is no support email address: this form and
  * that table ARE the contact channel, and the owner reads the
  * reports in the Supabase dashboard.
+ *
+ * Since v0.8.3 the form also asks the server to email the report
+ * to the owner (Edge Function `contact-notify`, via Resend). The
+ * email is fire-and-forget and must NEVER fail the report: if the
+ * function is unreachable or the email fails, the report stays
+ * saved and the user still sees the normal success message. The
+ * report id is generated here (a random UUID) so the form knows it
+ * without needing a SELECT on the table — there is deliberately no
+ * public SELECT policy on `contact_reports`.
  *
  * Honest failure: if Supabase is not connected, or the table does
  * not exist yet because the migration has not been applied, the
@@ -45,14 +55,37 @@ export function ContactPage({ nav }: { nav: PublicPageNav }) {
       return;
     }
     setLoading(true);
+    // The id is generated here so the form knows it without a
+    // SELECT on the table (there is deliberately no public SELECT
+    // policy on contact_reports). The server re-reads the row by
+    // this id before emailing — the client is never trusted for the
+    // report content.
+    const reportId = globalThis.crypto.randomUUID();
     const { error: insertError } = await supabase
       .from('contact_reports')
-      .insert({ name: name.trim(), email: email.trim(), topic, message: message.trim() });
+      .insert({ id: reportId, name: name.trim(), email: email.trim(), topic, message: message.trim() });
     setLoading(false);
     if (insertError) {
       setError('Your report could not be saved. Please try again later.');
       return;
     }
+    // Fire-and-forget: the email must never fail the report. The
+    // outcome is only logged to the console; the user still sees
+    // the normal success message either way.
+    void notifyContactReport(reportId)
+      .then((result) => {
+        if (result.ok) {
+          console.info('Contact report email sent.', result.data.id);
+        } else {
+          console.warn('Contact report email was not sent.', result.error.code);
+        }
+      })
+      .catch((err: unknown) => {
+        console.warn(
+          'Contact report email was not sent.',
+          err instanceof Error ? err.message : 'unknown error',
+        );
+      });
     setSaved(true);
   }
 
